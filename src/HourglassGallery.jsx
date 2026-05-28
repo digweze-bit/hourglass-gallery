@@ -387,11 +387,11 @@ function ArtistRow({artist,artworks,onClick}){
   const count=artworks.filter(w=>w.artist_id===artist.id).length;
   return (
     <div onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)}
-      style={{background:h?"#fff8f5":C.white,padding:"14px 16px",cursor:"pointer",transition:"background 0.2s",border:`1px solid ${h?C.orange:C.border}`,display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:72}}>
-      <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:18,fontWeight:400,color:h?C.orange:C.black,transition:"color 0.2s",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{artist.name}</div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8}}>
-        <div style={{fontSize:10,color:C.lightGrey,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingRight:8}}>{artist.medium}</div>
-        <span style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:h?C.orange:C.grey,whiteSpace:"nowrap",flexShrink:0}}>{count} work{count!==1?"s":""} →</span>
+      style={{background:h?"#fff8f5":C.white,padding:"10px 12px",cursor:"pointer",transition:"background 0.2s",border:`1px solid ${h?C.orange:C.border}`,display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:56}}>
+      <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:15,fontWeight:400,color:h?C.orange:C.black,transition:"color 0.2s",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{artist.name}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:6}}>
+        <div style={{fontSize:9,color:C.lightGrey,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingRight:8}}>{artist.medium}</div>
+        <span style={{fontSize:9,letterSpacing:"0.08em",textTransform:"uppercase",color:h?C.orange:C.grey,whiteSpace:"nowrap",flexShrink:0}}>{count} →</span>
       </div>
     </div>
   );
