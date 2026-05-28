@@ -46,6 +46,7 @@ const sbHeaders={"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Typ
 async function sbQuery(table,opts={}){let url=`${SB_URL}/rest/v1/${table}?`;if(opts.select)url+=`select=${opts.select}&`;if(opts.order)url+=`order=${opts.order}&`;const res=await fetch(url,{headers:sbHeaders});if(!res.ok)throw new Error(await res.text());return res.json();}
 async function sbInsert(table,data){const res=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:sbHeaders,body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json();}
 async function sbDelete(table,id){const res=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"DELETE",headers:sbHeaders});if(!res.ok)throw new Error(await res.text());}
+async function sbUpdate(table,id,data){const res=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"PATCH",headers:{...sbHeaders,"Prefer":"return=representation"},body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json();}
 async function sbUploadImage(bucket,dataUrl){const res=await fetch(dataUrl);const blob=await res.blob();const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;const up=await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path}`,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"image/jpeg","x-upsert":"true"},body:blob});if(!up.ok)throw new Error(await up.text());return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;}
 
 function Btn({onClick,children}){const [h,setH]=useState(false);return <button onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)} style={{background:h?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>{children}</button>;}
@@ -111,40 +112,208 @@ export default function HourglassAdmin() {
   );
 }
 
+
+// ── Modal ─────────────────────────────────
+function Modal({title,onClose,children}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",overflowY:"auto",padding:"40px 20px"}}>
+      <div style={{background:C.white,width:"100%",maxWidth:900,position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{padding:"20px 28px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:24,fontWeight:400}}>{title}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:C.lightGrey,lineHeight:1}}>×</button>
+        </div>
+        <div style={{padding:28}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function ArtistsList({artists,artworks,reload}){
   const [busy,setBusy]=useState("");
-  const del=async id=>{if(!confirm("Delete this artist and all their artworks?"))return;setBusy(id);try{await sbDelete("artists",id);await reload();}catch(e){alert("Error: "+e.message);}setBusy("");};
-  return(<table style={{width:"100%",borderCollapse:"collapse"}}>
-    <thead><tr>{["Name","Medium","Works",""].map(h=><th key={h} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
-    <tbody>
-      {!artists.length&&<tr><td colSpan={4} style={{padding:24,color:C.grey}}>No artists yet.</td></tr>}
-      {artists.map(a=><tr key={a.id}>
-        <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontFamily:"Cormorant Garamond,serif",fontSize:20}}>{a.name}</td>
-        <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.charcoal}}>{a.medium}</td>
-        <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13}}>{artworks.filter(w=>w.artist_id===a.id).length}</td>
-        <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`}}>{busy===a.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(a.id)}>Delete</DangerBtn>}</td>
-      </tr>)}
-    </tbody>
-  </table>);
+  const [editing,setEditing]=useState(null); // artist object being edited
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+
+  const del=async id=>{
+    if(!confirm("Delete this artist and all their artworks?"))return;
+    setBusy(id);
+    try{await sbDelete("artists",id);await reload();}
+    catch(e){alert("Error: "+e.message);}
+    setBusy("");
+  };
+
+  const openEdit=a=>setEditing({...a});
+  const f=k=>e=>setEditing(p=>({...p,[k]:e.target.value}));
+
+  const saveEdit=async()=>{
+    if(!editing.name.trim()){setErr("Name required.");return;}
+    setSaving(true);setErr("");
+    try{
+      const {id,_portraitData,...rest}=editing;
+      let portrait_url=editing.portrait_url||"";
+      if(_portraitData) portrait_url=await sbUploadImage("artist-portraits",_portraitData);
+      await sbUpdate("artists",id,{...rest,portrait_url,name:editing.name.trim()});
+      await reload();
+      setEditing(null);
+    }catch(e){setErr("Error: "+e.message);}
+    setSaving(false);
+  };
+
+  const handlePortrait=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    const {dataUrl}=await compressImage(file);
+    setEditing(p=>({...p,_portraitData:dataUrl}));
+  };
+
+  return(<>
+    <table style={{width:"100%",borderCollapse:"collapse"}}>
+      <thead><tr>{["Name","Medium","Works",""].map(h=><th key={h} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
+      <tbody>
+        {!artists.length&&<tr><td colSpan={4} style={{padding:24,color:C.grey}}>No artists yet.</td></tr>}
+        {artists.map(a=><tr key={a.id}>
+          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontFamily:"Cormorant Garamond,serif",fontSize:20}}>{a.name}</td>
+          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.charcoal}}>{a.medium}</td>
+          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13}}>{artworks.filter(w=>w.artist_id===a.id).length}</td>
+          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:12}}>
+            <button onClick={()=>openEdit(a)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.orange}}>Edit</button>
+            {busy===a.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(a.id)}>Delete</DangerBtn>}
+          </td>
+        </tr>)}
+      </tbody>
+    </table>
+
+    {/* Edit Artist Modal */}
+    {editing&&(
+      <Modal title={`Edit — ${editing.name}`} onClose={()=>setEditing(null)}>
+        <ErrMsg text={err}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+          <div>
+            <FInput label="Full Name *" value={editing.name||""} onChange={f("name")} placeholder="Artist name"/>
+            <FInput label="Nationality / Origin" value={editing.nationality||""} onChange={f("nationality")} placeholder="e.g. Nigerian, b. 1980"/>
+            <FInput label="Primary Medium" value={editing.medium||""} onChange={f("medium")} placeholder="e.g. Oil on canvas"/>
+            <FTextarea label="Biography" value={editing.bio||""} onChange={f("bio")} placeholder="2–4 sentences…"/>
+            <FInput label="Website / Instagram" value={editing.link||""} onChange={f("link")} placeholder="https://…"/>
+          </div>
+          <div>
+            <label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Portrait</label>
+            <div style={{border:`1.5px dashed ${C.border}`,padding:20,textAlign:"center",position:"relative",cursor:"pointer",marginBottom:16}}>
+              <input type="file" accept="image/*" onChange={handlePortrait} style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%",height:"100%"}}/>
+              {(editing._portraitData||editing.portrait_url)
+                ?<img src={editing._portraitData||editing.portrait_url} alt="" style={{maxWidth:"100%",maxHeight:140,objectFit:"contain"}}/>
+                :<div style={{fontSize:12,color:C.grey}}>Upload new portrait</div>}
+            </div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:8}}>
+          <Btn onClick={saveEdit}>{saving?"Saving…":"Save Changes"}</Btn>
+          <button onClick={()=>setEditing(null)} style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.grey}}>Cancel</button>
+        </div>
+      </Modal>
+    )}
+  </>);
 }
 
 function ArtworksList({artists,artworks,reload}){
   const [busy,setBusy]=useState("");
-  const del=async id=>{if(!confirm("Delete this artwork?"))return;setBusy(id);try{await sbDelete("artworks",id);await reload();}catch(e){alert("Error: "+e.message);}setBusy("");};
-  return(<table style={{width:"100%",borderCollapse:"collapse"}}>
-    <thead><tr>{["","Title","Artist","Year","Medium",""].map((h,i)=><th key={i} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
-    <tbody>
-      {!artworks.length&&<tr><td colSpan={6} style={{padding:24,color:C.grey}}>No artworks yet.</td></tr>}
-      {artworks.map(w=>{const art=artists.find(a=>a.id===w.artist_id);return<tr key={w.id}>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`}}><img src={w.image_url} alt="" style={{width:40,height:40,objectFit:"cover",background:C.border,display:"block"}}/></td>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontFamily:"Cormorant Garamond,serif",fontSize:17}}>{w.title}</td>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13,color:C.charcoal}}>{art?.name}</td>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13}}>{w.year}</td>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.grey}}>{w.medium}</td>
-        <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`}}>{busy===w.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(w.id)}>Delete</DangerBtn>}</td>
-      </tr>;})}
-    </tbody>
-  </table>);
+  const [editing,setEditing]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+
+  const del=async id=>{
+    if(!confirm("Delete this artwork?"))return;
+    setBusy(id);
+    try{await sbDelete("artworks",id);await reload();}
+    catch(e){alert("Error: "+e.message);}
+    setBusy("");
+  };
+
+  const openEdit=w=>setEditing({...w,tags:w.tags||[]});
+  const f=k=>e=>setEditing(p=>({...p,[k]:e.target.value}));
+
+  const handleNewImage=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    const {dataUrl,origW,origH}=await compressImage(file);
+    setEditing(p=>({...p,_newImageData:dataUrl,dimensions:p.dimensions||`${origW} × ${origH} px`}));
+  };
+
+  const saveEdit=async()=>{
+    if(!editing.title.trim()){setErr("Title required.");return;}
+    setSaving(true);setErr("");
+    try{
+      const {id,_newImageData,...rest}=editing;
+      let image_url=editing.image_url;
+      if(_newImageData) image_url=await sbUploadImage("artwork-images",_newImageData);
+      await sbUpdate("artworks",id,{...rest,image_url,title:editing.title.trim(),tags:editing.tags||[]});
+      await reload();
+      setEditing(null);
+    }catch(e){setErr("Error: "+e.message);}
+    setSaving(false);
+  };
+
+  return(<>
+    <table style={{width:"100%",borderCollapse:"collapse"}}>
+      <thead><tr>{["","Title","Artist","Year","Medium",""].map((h,i)=><th key={i} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
+      <tbody>
+        {!artworks.length&&<tr><td colSpan={6} style={{padding:24,color:C.grey}}>No artworks yet.</td></tr>}
+        {artworks.map(w=>{
+          const art=artists.find(a=>a.id===w.artist_id);
+          return<tr key={w.id}>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`}}><img src={w.image_url} alt="" style={{width:40,height:40,objectFit:"cover",background:C.border,display:"block"}}/></td>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontFamily:"Cormorant Garamond,serif",fontSize:17}}>{w.title}</td>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13,color:C.charcoal}}>{art?.name}</td>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13}}>{w.year}</td>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.grey}}>{w.medium}</td>
+            <td style={{padding:"10px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:12,alignItems:"center"}}>
+              <button onClick={()=>openEdit(w)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.orange}}>Edit</button>
+              {busy===w.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(w.id)}>Delete</DangerBtn>}
+            </td>
+          </tr>;
+        })}
+      </tbody>
+    </table>
+
+    {/* Edit Artwork Modal */}
+    {editing&&(
+      <Modal title={`Edit — ${editing.title}`} onClose={()=>setEditing(null)}>
+        <ErrMsg text={err}/>
+        <div style={{display:"grid",gridTemplateColumns:"200px 1fr 1fr",gap:24}}>
+          {/* Image */}
+          <div>
+            <label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Image</label>
+            <div style={{position:"relative",marginBottom:12}}>
+              <img src={editing._newImageData||editing.image_url} alt="" style={{width:"100%",aspectRatio:"1",objectFit:"cover",display:"block",border:`1px solid ${C.border}`}}/>
+            </div>
+            <div style={{border:`1.5px dashed ${C.border}`,padding:12,textAlign:"center",position:"relative",cursor:"pointer"}}>
+              <input type="file" accept="image/*" onChange={handleNewImage} style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%",height:"100%"}}/>
+              <div style={{fontSize:11,color:C.grey}}>Replace image</div>
+            </div>
+          </div>
+          {/* Left fields */}
+          <div>
+            <FInput label="Title *" value={editing.title||""} onChange={f("title")} placeholder="Artwork title"/>
+            <FInput label="Year" value={editing.year||""} onChange={f("year")} placeholder="e.g. 2024"/>
+            <FInput label="Medium" value={editing.medium||""} onChange={f("medium")} placeholder="e.g. Oil on canvas"/>
+            <FInput label="Dimensions" value={editing.dimensions||""} onChange={f("dimensions")} placeholder="e.g. 24×36"/>
+            <FInput label="NGN Price" value={editing.price||""} onChange={f("price")} placeholder="e.g. 4,500,000"/>
+          </div>
+          {/* Right fields */}
+          <div>
+            <FSelect label="Artist" value={editing.artist_id||""} onChange={f("artist_id")}
+              options={[{value:"",label:"— Select —"},...artists.map(a=>({value:a.id,label:a.name}))]}/>
+            <FInput label="Series / Edition" value={editing.series||""} onChange={f("series")} placeholder="e.g. Edition 1/5"/>
+            <FSelect label="Availability" value={editing.availability||"Available"} onChange={f("availability")}
+              options={["Available","Sold","On Loan","NFS"]}/>
+            <FTextarea label="Write-up" value={editing.writeup||""} onChange={f("writeup")} placeholder="Description…"/>
+            <TagInput tags={editing.tags||[]} onChange={tags=>setEditing(p=>({...p,tags}))}/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:8}}>
+          <Btn onClick={saveEdit}>{saving?"Saving…":"Save Changes"}</Btn>
+          <button onClick={()=>setEditing(null)} style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.grey}}>Cancel</button>
+        </div>
+      </Modal>
+    )}
+  </>);
 }
 
 function BatchUpload({artists,reload}){
@@ -383,12 +552,14 @@ function AddArtworkForm({artists,reload}){
   const save=async()=>{
     if(!form.title.trim()){setErr("Title required.");return;}
     if(!form.artist_id){setErr("Select an artist.");return;}
-    if(!form._imageData){setErr("Upload an image.");return;}
+    if(!form._imageData){setErr("Please upload an image.");return;}
     setSaving(true);setErr("");
     try{
       const image_url=await sbUploadImage("artwork-images",form._imageData);
       const {_imageData,...rest}=form;
-      await sbInsert("artworks",{...rest,image_url,title:form.title.trim(),tags:form.tags||[]});
+      // Remove internal fields before insert
+      const {tags,...restNoTags}=rest;
+      await sbInsert("artworks",{...restNoTags,image_url,title:form.title.trim(),tags:form.tags||[]});
       await reload();
       setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
       setOk(true);setTimeout(()=>setOk(false),3000);
