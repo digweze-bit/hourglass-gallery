@@ -406,46 +406,57 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
   const [copied,setCopied]=useState(false);
   const qrUrl=`${window.location.origin}${window.location.pathname}?artist=${artistId}`;
   if(!artist) return null;
-  const parts=artist.name.split(" "); const last=parts.pop(); const first=parts.join(" ");
+
   return (
     <div>
       <BackBtn onClick={onBack} label="All Artists"/>
-      <div style={{padding:"48px 40px",borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 280px",gap:60}}>
+
+      {/* ── Artist name header — minimal, sans-serif, grey ── */}
+      <div style={{padding:"24px 40px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
         <div>
-          <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:60,fontWeight:300,lineHeight:1,letterSpacing:"-0.01em"}}>
-            {first&&<span>{first}<br/></span>}
-            <em style={{color:C.orange,fontStyle:"italic"}}>{last}</em>
-          </div>
-          {artist.nationality&&<div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,marginTop:16}}>{artist.nationality}{artist.medium?" · "+artist.medium:""}</div>}
-          <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:19,fontWeight:300,lineHeight:1.75,color:C.charcoal,marginTop:20,maxWidth:560}}>
-            {artist.bio||<em style={{color:C.lightGrey}}>No biography added yet.</em>}
-          </div>
+          <div style={{fontFamily:"DM Sans,Helvetica Neue,sans-serif",fontSize:22,fontWeight:300,color:C.charcoal,letterSpacing:"0.02em"}}>{artist.name}</div>
+          {(artist.nationality||artist.medium)&&(
+            <div style={{fontSize:11,color:C.lightGrey,marginTop:4,fontFamily:"DM Sans,sans-serif",letterSpacing:"0.04em"}}>
+              {[artist.nationality,artist.medium].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
-        <div>
-          {artist.link&&<div style={{marginBottom:20}}>
-            <div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,marginBottom:6}}>Website</div>
-            <a href={artist.link} target="_blank" rel="noreferrer" style={{color:C.orange,fontSize:13,textDecoration:"none"}}>{artist.link.replace("https://","")}</a>
-          </div>}
-          <div style={{border:`1px solid ${C.border}`,padding:20,textAlign:"center"}}>
-            <div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,marginBottom:12}}>Scan to view on phone</div>
-            <QRCode text={qrUrl} size={140}/>
-            <button onClick={()=>{navigator.clipboard.writeText(qrUrl);setCopied(true);setTimeout(()=>setCopied(false),2000);}}
-              style={{marginTop:12,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",color:copied?C.orange:C.grey,background:"none",border:"none",cursor:"pointer",textDecoration:"underline",fontFamily:"DM Sans,sans-serif"}}>
-              {copied?"Link copied!":"Copy artist link"}
-            </button>
-          </div>
+        {/* QR + copy — compact, right-aligned */}
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          {artist.link&&<a href={artist.link} target="_blank" rel="noreferrer"
+            style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:C.lightGrey,textDecoration:"none",fontFamily:"DM Sans,sans-serif"}}>
+            Website ↗
+          </a>}
+          <button onClick={()=>{navigator.clipboard.writeText(qrUrl);setCopied(true);setTimeout(()=>setCopied(false),2000);}}
+            style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:copied?C.orange:C.lightGrey,background:"none",border:"none",cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}>
+            {copied?"Link copied!":"Copy link"}
+          </button>
+          <QRCode text={qrUrl} size={52}/>
         </div>
       </div>
-      <div style={{padding:"36px 40px"}}>
-        <div style={{fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:C.grey,marginBottom:24}}>{works.length} Work{works.length!==1?"s":""} — {artist.name}</div>
+
+      {/* ── Works grid ── */}
+      <div style={{padding:"24px 40px"}}>
+        <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginBottom:16,fontFamily:"DM Sans,sans-serif"}}>
+          {works.length} Work{works.length!==1?"s":""}
+        </div>
         {!works.length
-          ? <div style={{color:C.lightGrey,fontFamily:"Cormorant Garamond,serif",fontSize:22,fontWeight:300}}>No works yet.</div>
+          ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works yet.</div>
           : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:2}}>
               {works.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
             </div>
         }
       </div>
-      <div style={{height:60}}/>
+
+      {/* ── Biography — bottom of page, small sans-serif grey ── */}
+      {artist.bio&&(
+        <div style={{padding:"32px 40px 60px",borderTop:`1px solid ${C.border}`,maxWidth:640}}>
+          <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginBottom:12,fontFamily:"DM Sans,sans-serif"}}>Biography</div>
+          <div style={{fontFamily:"DM Sans,Helvetica Neue,sans-serif",fontSize:12,fontWeight:300,lineHeight:1.8,color:C.lightGrey}}>
+            {artist.bio}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
