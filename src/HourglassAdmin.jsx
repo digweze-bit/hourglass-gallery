@@ -165,7 +165,7 @@ function BatchUpload({artists,reload}){
     let parsedArtist="",title="",medium="",dimensions="",year="",price="";
     if(allParts.length>=2){parsedArtist=allParts[0]||"";title=allParts[1]||"";medium=allParts[2]||"";dimensions=allParts[3]||"";year=allParts[4]||"";price=allParts.slice(5).join(",").trim();}
     else{title=rawName.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());}
-    return{id:"b"+Date.now()+Math.random(),image:dataUrl,parsedArtist,title,medium,dimensions,year,price,imageDimensions:`${origW} × ${origH} px`,compressInfo:`${newW}×${newH}px · ${kb}KB`,availability:"Available",writeup:""};
+    return{id:"b"+Date.now()+Math.random(),image:dataUrl,parsedArtist,title,medium,dimensions,year,price,imageDimensions:`${origW} × ${origH} px`,compressInfo:`${newW}×${newH}px · ${kb}KB`,availability:"Available",writeup:"",tags:[]};
   };
 
   const addFiles=async files=>{
@@ -192,7 +192,7 @@ function BatchUpload({artists,reload}){
       const it=items[i];
       try{
         const image_url=await sbUploadImage("artwork-images",it.image);
-        await sbInsert("artworks",{artist_id:it.resolvedArtistId||artistId,title:it.title,year:it.year||null,medium:it.medium||null,dimensions:it.dimensions||null,series:it.series||null,availability:it.availability,writeup:it.writeup||null,image_url,price:it.price||null});
+        await sbInsert("artworks",{artist_id:it.resolvedArtistId||artistId,title:it.title,year:it.year||null,medium:it.medium||null,dimensions:it.dimensions||null,series:it.series||null,availability:it.availability,writeup:it.writeup||null,image_url,price:it.price||null,tags:it.tags||[]});
       }catch(e){failed++;}
       setProgress({done:i+1,total:items.length});
     }
@@ -272,12 +272,63 @@ function BatchCard({item,onUpdate,onRemove,artists}){
         <button onClick={()=>onRemove(item.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:C.lightGrey,lineHeight:1}}>×</button>
       </div>
     </div>
-    {exp&&<div style={{padding:"16px 20px",borderTop:`1px solid ${C.border}`,background:"#fcfcfa",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
-      <FInput label="Dimensions" value={item.dimensions} onChange={u("dimensions")} placeholder="e.g. 24x36"/>
-      <FInput label="NGN Price" value={item.price||""} onChange={u("price")} placeholder="e.g. 4,500,000"/>
-      <FTextarea label="Art Write-up" value={item.writeup} onChange={u("writeup")} placeholder="Description or note…"/>
+    {exp&&<div style={{padding:"16px 20px",borderTop:`1px solid ${C.border}`,background:"#fcfcfa",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div>
+        <FInput label="Dimensions" value={item.dimensions} onChange={u("dimensions")} placeholder="e.g. 24x36"/>
+        <FInput label="NGN Price" value={item.price||""} onChange={u("price")} placeholder="e.g. 4,500,000"/>
+        <FTextarea label="Art Write-up" value={item.writeup} onChange={u("writeup")} placeholder="Description or note…"/>
+      </div>
+      <div><TagInput tags={item.tags||[]} onChange={tags=>onUpdate(item.id,"tags",tags)}/></div>
     </div>}
   </div>);
+}
+
+
+// ── Tag Input ─────────────────────────────
+const SIZE_TAGS=[{value:"sm",label:"Small"},{value:"md",label:"Medium"},{value:"lg",label:"Large"},{value:"xl",label:"Extra Large"}];
+
+function TagInput({tags,onChange}){
+  const [input,setInput]=useState("");
+  const current=tags||[];
+  const add=val=>{
+    const v=val.trim().toLowerCase().replace(/\s+/g,"-");
+    if(v&&!current.includes(v)) onChange([...current,v]);
+    setInput("");
+  };
+  const remove=v=>onChange(current.filter(t=>t!==v));
+  const handleKey=e=>{ if(e.key==="Enter"||e.key===","){ e.preventDefault(); add(input); }};
+  return(
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Tags</label>
+      {/* Size presets */}
+      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+        {SIZE_TAGS.map(s=>(
+          <button key={s.value} onClick={()=>current.includes(s.value)?remove(s.value):add(s.value)}
+            style={{padding:"4px 10px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",cursor:"pointer",border:`1px solid ${current.includes(s.value)?C.orange:C.border}`,background:current.includes(s.value)?"#fff8f5":C.white,color:current.includes(s.value)?C.orange:C.grey,transition:"all 0.15s"}}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {/* Current tags */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+        {current.map(t=>(
+          <span key={t} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",background:C.bg,border:`1px solid ${C.border}`,color:C.charcoal}}>
+            {t}
+            <button onClick={()=>remove(t)} style={{background:"none",border:"none",cursor:"pointer",color:C.lightGrey,fontSize:12,lineHeight:1,padding:0}}>×</button>
+          </span>
+        ))}
+      </div>
+      {/* Free text input */}
+      <div style={{display:"flex",gap:8}}>
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKey}
+          placeholder="Type a tag and press Enter (e.g. portrait, abstract, blue)"
+          style={{flex:1,padding:"8px 12px",border:`1px solid ${C.border}`,fontFamily:"DM Sans,sans-serif",fontSize:12,outline:"none",color:C.black}}/>
+        <button onClick={()=>add(input)}
+          style={{padding:"8px 14px",background:C.black,color:C.white,border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif"}}>Add</button>
+      </div>
+      <div style={{fontSize:10,color:C.lightGrey,marginTop:6,letterSpacing:"0.06em"}}>Size presets: sm · md · lg · xl — plus any free tag: subject, style, colour, series</div>
+    </div>
+  );
 }
 
 function AddArtistForm({reload}){
@@ -325,7 +376,7 @@ function AddArtistForm({reload}){
 }
 
 function AddArtworkForm({artists,reload}){
-  const [form,setForm]=useState({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
+  const [form,setForm]=useState({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:"",tags:[]});
   const [ok,setOk]=useState(false);const [err,setErr]=useState("");const [saving,setSaving]=useState(false);
   const f=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
   const handleImage=async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());const {dataUrl,origW,origH}=await compressImage(file);setForm(p=>({...p,_imageData:dataUrl,title:p.title||name,dimensions:p.dimensions||`${origW} × ${origH} px`}));};
@@ -337,7 +388,7 @@ function AddArtworkForm({artists,reload}){
     try{
       const image_url=await sbUploadImage("artwork-images",form._imageData);
       const {_imageData,...rest}=form;
-      await sbInsert("artworks",{...rest,image_url,title:form.title.trim()});
+      await sbInsert("artworks",{...rest,image_url,title:form.title.trim(),tags:form.tags||[]});
       await reload();
       setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
       setOk(true);setTimeout(()=>setOk(false),3000);
@@ -369,6 +420,7 @@ function AddArtworkForm({artists,reload}){
         <FTextarea label="Write-up" value={form.writeup} onChange={f("writeup")} placeholder="Description or note…"/>
       </div>
     </div>
+    <TagInput tags={form.tags} onChange={tags=>setForm(p=>({...p,tags}))}/>
     <Btn onClick={save}>{saving?"Uploading…":"Save Artwork"}</Btn>
   </div>);
 }
