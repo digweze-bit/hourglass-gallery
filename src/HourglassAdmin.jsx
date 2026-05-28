@@ -44,9 +44,20 @@ function compressImage(file) {
 
 const sbHeaders={"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
 async function sbQuery(table,opts={}){let url=`${SB_URL}/rest/v1/${table}?`;if(opts.select)url+=`select=${opts.select}&`;if(opts.order)url+=`order=${opts.order}&`;const res=await fetch(url,{headers:sbHeaders});if(!res.ok)throw new Error(await res.text());return res.json();}
-async function sbInsert(table,data){const res=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:sbHeaders,body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json();}
+async function sbInsert(table,data){
+  // Strip undefined values so missing columns don't cause schema errors
+  const clean=Object.fromEntries(Object.entries(data).filter(([,v])=>v!==undefined));
+  const res=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:sbHeaders,body:JSON.stringify(clean)});
+  if(!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 async function sbDelete(table,id){const res=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"DELETE",headers:sbHeaders});if(!res.ok)throw new Error(await res.text());}
-async function sbUpdate(table,id,data){const res=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"PATCH",headers:{...sbHeaders,"Prefer":"return=representation"},body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json();}
+async function sbUpdate(table,id,data){
+  const clean=Object.fromEntries(Object.entries(data).filter(([,v])=>v!==undefined));
+  const res=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"PATCH",headers:{...sbHeaders,"Prefer":"return=representation"},body:JSON.stringify(clean)});
+  if(!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 async function sbUploadImage(bucket,dataUrl){const res=await fetch(dataUrl);const blob=await res.blob();const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;const up=await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path}`,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"image/jpeg","x-upsert":"true"},body:blob});if(!up.ok)throw new Error(await up.text());return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;}
 
 function Btn({onClick,children}){const [h,setH]=useState(false);return <button onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)} style={{background:h?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>{children}</button>;}
@@ -152,7 +163,14 @@ function ArtistsList({artists,artworks,reload}){
       const {id,_portraitData,...rest}=editing;
       let portrait_url=editing.portrait_url||"";
       if(_portraitData) portrait_url=await sbUploadImage("artist-portraits",_portraitData);
-      await sbUpdate("artists",id,{...rest,portrait_url,name:editing.name.trim()});
+      await sbUpdate("artists",id,{
+        name:        editing.name.trim(),
+        nationality: editing.nationality||null,
+        medium:      editing.medium||null,
+        bio:         editing.bio||null,
+        link:        editing.link||null,
+        portrait_url,
+      });
       await reload();
       setEditing(null);
     }catch(e){setErr("Error: "+e.message);}
@@ -243,7 +261,19 @@ function ArtworksList({artists,artworks,reload}){
       const {id,_newImageData,...rest}=editing;
       let image_url=editing.image_url;
       if(_newImageData) image_url=await sbUploadImage("artwork-images",_newImageData);
-      await sbUpdate("artworks",id,{...rest,image_url,title:editing.title.trim(),tags:editing.tags||[]});
+      await sbUpdate("artworks",id,{
+        artist_id:   editing.artist_id,
+        title:       editing.title.trim(),
+        year:        editing.year||null,
+        medium:      editing.medium||null,
+        dimensions:  editing.dimensions||null,
+        series:      editing.series||null,
+        availability:editing.availability,
+        writeup:     editing.writeup||null,
+        price:       editing.price||null,
+        tags:        editing.tags||[],
+        image_url,
+      });
       await reload();
       setEditing(null);
     }catch(e){setErr("Error: "+e.message);}
@@ -353,15 +383,28 @@ function BatchUpload({artists,reload}){
   const remove=id=>setItems(prev=>prev.filter(it=>it.id!==id));
 
   const saveAll=async()=>{
-    if(!artistId&&items.some(it=>!it.resolvedArtistId)){setErr("Some artworks have no artist assigned.");return;}
     if(!items.length){setErr("No images to save.");return;}
+    const unassigned=items.filter(it=>!it.resolvedArtistId&&!artistId);
+    if(unassigned.length>0){setErr(`${unassigned.length} artwork(s) have no artist assigned. Use the artist dropdown in each row or set a default artist in Step 1.`);return;}
     setSaving(true);setErr("");setProgress({done:0,total:items.length});
     let failed=0;
     for(let i=0;i<items.length;i++){
       const it=items[i];
       try{
         const image_url=await sbUploadImage("artwork-images",it.image);
-        await sbInsert("artworks",{artist_id:it.resolvedArtistId||artistId,title:it.title,year:it.year||null,medium:it.medium||null,dimensions:it.dimensions||null,series:it.series||null,availability:it.availability,writeup:it.writeup||null,image_url,price:it.price||null,tags:it.tags||[]});
+        await sbInsert("artworks",{
+          artist_id: it.resolvedArtistId||artistId,
+          title:     it.title||"Untitled",
+          year:      it.year||null,
+          medium:    it.medium||null,
+          dimensions:it.dimensions||null,
+          series:    null,
+          availability: it.availability||"Available",
+          writeup:   it.writeup||null,
+          price:     it.price||null,
+          tags:      it.tags||[],
+          image_url,
+        });
       }catch(e){failed++;}
       setProgress({done:i+1,total:items.length});
     }
@@ -556,10 +599,19 @@ function AddArtworkForm({artists,reload}){
     setSaving(true);setErr("");
     try{
       const image_url=await sbUploadImage("artwork-images",form._imageData);
-      const {_imageData,...rest}=form;
-      // Remove internal fields before insert
-      const {tags,...restNoTags}=rest;
-      await sbInsert("artworks",{...restNoTags,image_url,title:form.title.trim(),tags:form.tags||[]});
+      await sbInsert("artworks",{
+        artist_id:form.artist_id,
+        title:form.title.trim(),
+        year:form.year||null,
+        medium:form.medium||null,
+        dimensions:form.dimensions||null,
+        series:form.series||null,
+        availability:form.availability,
+        writeup:form.writeup||null,
+        price:form.price||null,
+        tags:form.tags||[],
+        image_url,
+      });
       await reload();
       setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
       setOk(true);setTimeout(()=>setOk(false),3000);
