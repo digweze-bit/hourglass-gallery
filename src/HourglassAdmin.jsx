@@ -276,7 +276,7 @@ function ArtistsList({artists,artworks,reload}){
   return(<>
     {!artists.length&&<div style={{padding:24,color:C.grey,fontSize:12}}>No artists yet.</div>}
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1,background:C.border}}>
-      {artists.map(a=>{
+      {[...artists].sort((a,b)=>a.name.localeCompare(b.name)).map(a=>{
         const count=artworks.filter(w=>w.artist_id===a.id).length;
         return(
           <div key={a.id} style={{background:C.white,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
