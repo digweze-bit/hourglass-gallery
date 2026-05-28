@@ -68,13 +68,97 @@ function FSelect({label,value,onChange,options}){return <div style={{marginBotto
 function SuccessMsg({show,text}){if(!show)return null;return <div style={{padding:"12px 16px",background:"#f0fff4",border:"1px solid #a3e9b5",fontSize:12,color:"#1a7a3c",marginBottom:20}}>{text}</div>;}
 function ErrMsg({text}){if(!text)return null;return <div style={{padding:"12px 16px",background:"#fff0f0",border:"1px solid #ffcccc",fontSize:12,color:"#cc0000",marginBottom:20}}>{text}</div>;}
 
+// ── Credentials (change password here) ───
+const ADMIN_USER = "hourglass";
+const ADMIN_PASS = "gallery2024";
+const RESET_EMAIL = "info@hourglassgallery.com";
+
+function LoginScreen({onLogin}){
+  const [user,setUser]=useState("");
+  const [pass,setPass]=useState("");
+  const [err,setErr]=useState("");
+  const [showReset,setShowReset]=useState(false);
+  const [showPass,setShowPass]=useState(false);
+
+  const attempt=()=>{
+    if(user.trim()===ADMIN_USER && pass===ADMIN_PASS){
+      sessionStorage.setItem("hg_admin","1");
+      onLogin();
+    } else {
+      setErr("Incorrect username or password.");
+    }
+  };
+
+  const handleKey=e=>{ if(e.key==="Enter") attempt(); };
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"DM Sans,sans-serif"}}>
+      <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:36,objectFit:"contain",marginBottom:40}}/>
+      <div style={{width:"100%",maxWidth:360,background:C.white,border:`1px solid ${C.border}`,padding:36}}>
+        <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:28,fontWeight:300,marginBottom:4}}>Admin Access</div>
+        <div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,marginBottom:28}}>Hourglass Gallery</div>
+
+        {!showReset ? (<>
+          <ErrMsg text={err}/>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Username</label>
+            <input value={user} onChange={e=>setUser(e.target.value)} onKeyDown={handleKey} placeholder="Username"
+              style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.border}`,fontFamily:"DM Sans,sans-serif",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Password</label>
+            <div style={{position:"relative"}}>
+              <input value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={handleKey}
+                type={showPass?"text":"password"} placeholder="Password"
+                style={{width:"100%",padding:"10px 40px 10px 14px",border:`1px solid ${C.border}`,fontFamily:"DM Sans,sans-serif",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+              <button onClick={()=>setShowPass(s=>!s)}
+                style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:11,color:C.grey,fontFamily:"DM Sans,sans-serif"}}>
+                {showPass?"Hide":"Show"}
+              </button>
+            </div>
+          </div>
+          <div style={{textAlign:"right",marginBottom:24}}>
+            <button onClick={()=>{setShowReset(true);setErr("");}}
+              style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:C.grey,fontFamily:"DM Sans,sans-serif",textDecoration:"underline"}}>
+              Forgot password?
+            </button>
+          </div>
+          <button onClick={attempt}
+            style={{width:"100%",background:C.black,color:C.white,border:"none",cursor:"pointer",padding:"12px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}
+            onMouseOver={e=>e.target.style.background=C.orange} onMouseOut={e=>e.target.style.background=C.black}>
+            Sign In
+          </button>
+        </>) : (<>
+          <div style={{padding:"16px",background:"#f0f8ff",border:"1px solid #cce0ff",marginBottom:20}}>
+            <div style={{fontSize:13,color:C.charcoal,lineHeight:1.6}}>
+              To reset your password, send an email to:<br/>
+              <a href={`mailto:${RESET_EMAIL}?subject=Admin Password Reset Request&body=Please reset the Hourglass Gallery admin password.`}
+                style={{color:C.orange,fontWeight:500}}>{RESET_EMAIL}</a>
+            </div>
+            <div style={{fontSize:11,color:C.grey,marginTop:8}}>
+              A new password will be sent to this address.
+            </div>
+          </div>
+          <button onClick={()=>setShowReset(false)}
+            style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.grey}}>
+            ← Back to Login
+          </button>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
 export default function HourglassAdmin() {
   useEffect(()=>{injectFonts();},[]);
+  const [authed,setAuthed]=useState(()=>sessionStorage.getItem("hg_admin")==="1");
   const [artists,setArtists]=useState([]);
   const [artworks,setArtworks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [tab,setTab]=useState("artists");
+
+  if(!authed) return <LoginScreen onLogin={()=>setAuthed(true)}/>;
 
   const tabs=[{id:"artists",label:"Artists"},{id:"artworks",label:"Artworks"},{id:"batch",label:"⊕ Batch Upload"},{id:"add-artist",label:"+ Add Artist"},{id:"add-artwork",label:"+ Add Artwork"}];
 
@@ -92,7 +176,13 @@ export default function HourglassAdmin() {
     <div style={{fontFamily:"DM Sans,Helvetica Neue,Arial,sans-serif",background:C.bg,color:C.black,minHeight:"100vh"}}>
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 40px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
         <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:30,objectFit:"contain"}}/>
-        <div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.orange}}>Admin Panel</div>
+        <div style={{display:"flex",alignItems:"center",gap:20}}>
+          <div style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.orange}}>Admin Panel</div>
+          <button onClick={()=>{sessionStorage.removeItem("hg_admin");window.location.reload();}}
+            style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",padding:"6px 14px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.grey}}>
+            Sign Out
+          </button>
+        </div>
       </nav>
 
       <div style={{padding:"40px"}}>
@@ -184,21 +274,24 @@ function ArtistsList({artists,artworks,reload}){
   };
 
   return(<>
-    <table style={{width:"100%",borderCollapse:"collapse"}}>
-      <thead><tr>{["Name","Medium","Works",""].map(h=><th key={h} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
-      <tbody>
-        {!artists.length&&<tr><td colSpan={4} style={{padding:24,color:C.grey}}>No artists yet.</td></tr>}
-        {artists.map(a=><tr key={a.id}>
-          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontFamily:"Cormorant Garamond,serif",fontSize:20}}>{a.name}</td>
-          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.charcoal}}>{a.medium}</td>
-          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,fontSize:13}}>{artworks.filter(w=>w.artist_id===a.id).length}</td>
-          <td style={{padding:"14px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:12}}>
-            <button onClick={()=>openEdit(a)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.orange}}>Edit</button>
-            {busy===a.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(a.id)}>Delete</DangerBtn>}
-          </td>
-        </tr>)}
-      </tbody>
-    </table>
+    {!artists.length&&<div style={{padding:24,color:C.grey,fontSize:12}}>No artists yet.</div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1,background:C.border}}>
+      {artists.map(a=>{
+        const count=artworks.filter(w=>w.artist_id===a.id).length;
+        return(
+          <div key={a.id} style={{background:C.white,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:15,fontWeight:400,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</div>
+              <div style={{fontSize:10,color:C.lightGrey,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.medium} · {count} work{count!==1?"s":""}</div>
+            </div>
+            <div style={{display:"flex",gap:10,flexShrink:0}}>
+              <button onClick={()=>openEdit(a)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.orange,whiteSpace:"nowrap"}}>Edit</button>
+              {busy===a.id?<span style={{fontSize:10,color:C.grey}}>…</span>:<DangerBtn onClick={()=>del(a.id)}>Delete</DangerBtn>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
 
     {/* Edit Artist Modal */}
     {editing&&(
