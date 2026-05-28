@@ -334,7 +334,9 @@ function HomeScreen({artists,artworks,search,setSearch,onSelectArtist,onSelectWo
             : Object.keys(groups).sort().map(letter=>(
             <div key={letter}>
               <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:13,fontWeight:300,color:C.lightGrey,padding:"20px 0 8px",borderBottom:`1px solid ${C.border}`}}>{letter}</div>
-              {groups[letter].map(a=><ArtistRow key={a.id} artist={a} artworks={artworks} onClick={()=>onSelectArtist(a.id)}/>)}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:2,marginTop:2}}>
+                {groups[letter].map(a=><ArtistRow key={a.id} artist={a} artworks={artworks} onClick={()=>onSelectArtist(a.id)}/>)}
+              </div>
             </div>
           ))
         }
@@ -385,14 +387,11 @@ function ArtistRow({artist,artworks,onClick}){
   const count=artworks.filter(w=>w.artist_id===artist.id).length;
   return (
     <div onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)}
-      style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:`16px ${h?8:0}px`,borderBottom:`1px solid ${C.border}`,cursor:"pointer",transition:"padding 0.2s"}}>
-      <div style={{display:"flex",alignItems:"center",gap:20}}>
-        <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:26,fontWeight:400,color:h?C.orange:C.black,transition:"color 0.2s"}}>{artist.name}</div>
-        <div style={{fontSize:11,color:C.lightGrey}}>{artist.medium}</div>
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:16}}>
-        <span style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:C.grey}}>{count} work{count!==1?"s":""}</span>
-        <span style={{fontSize:18,color:h?C.orange:C.lightGrey,transition:"all 0.2s",transform:h?"translateX(4px)":"none",display:"inline-block"}}>→</span>
+      style={{background:h?"#fff8f5":C.white,padding:"14px 16px",cursor:"pointer",transition:"background 0.2s",border:`1px solid ${h?C.orange:C.border}`,display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:72}}>
+      <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:18,fontWeight:400,color:h?C.orange:C.black,transition:"color 0.2s",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{artist.name}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8}}>
+        <div style={{fontSize:10,color:C.lightGrey,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingRight:8}}>{artist.medium}</div>
+        <span style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:h?C.orange:C.grey,whiteSpace:"nowrap",flexShrink:0}}>{count} work{count!==1?"s":""} →</span>
       </div>
     </div>
   );
