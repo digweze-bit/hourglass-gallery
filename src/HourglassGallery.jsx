@@ -465,7 +465,7 @@ function ThumbItem({work,onClick}){
   return (
     <div onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)}
       style={{position:"relative",aspectRatio:"1",background:C.border,cursor:"pointer",overflow:"hidden"}}>
-      <img src={work.image_url} alt={work.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block",transition:"transform 0.4s",transform:h?"scale(1.04)":"scale(1)"}} onError={e=>{e.target.style.display="none";}}/>
+      <img src={work.image_url} alt={work.title} style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:work.image_position==="top"?"top":"center",display:"block",transition:"transform 0.4s",transform:h?"scale(1.04)":"scale(1)"}} onError={e=>{e.target.style.display="none";}}/>
       <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 40%,rgba(0,0,0,0.7))",opacity:h?1:0,transition:"opacity 0.3s",display:"flex",flexDirection:"column",justifyContent:"flex-end",padding:"16px 12px 12px"}}>
         <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:15,color:"#fff",fontWeight:300}}>{work.title}</div>
         <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",marginTop:2}}>{work.year}</div>
