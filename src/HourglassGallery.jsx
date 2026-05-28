@@ -483,34 +483,42 @@ function ArtworkScreen({artists,artworks,artworkId,onBack}){
   const [copied,setCopied]=useState(false);
   const shareUrl=`${window.location.origin}${window.location.pathname}?artwork=${artworkId}`;
   if(!work) return null;
-  const specs=[["Artist",artist?.name],["Year",work.year],["Medium",work.medium],["Dimensions",work.dimensions?`${work.dimensions} in`:null],["Series / Edition",work.series],["Availability",work.availability]].filter(([,v])=>v);
+  const specs=[["Year",work.year],["Medium",work.medium],["Dimensions",work.dimensions?`${work.dimensions} in`:null],["Series / Edition",work.series],["Availability",work.availability]].filter(([,v])=>v);
   return (
     <div>
       <BackBtn onClick={onBack} label={artist?.name||"Artist"}/>
-      <div style={{padding:"0 40px"}}>
-        <div style={{width:"100%",maxHeight:"68vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.white,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-          <img src={work.image_url} alt={work.title} style={{maxWidth:"100%",maxHeight:"68vh",objectFit:"contain",display:"block"}}/>
-        </div>
+
+      {/* Image — flush, no white box, background matches page */}
+      <div style={{width:"100%",maxHeight:"72vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg,overflow:"hidden"}}>
+        <img src={work.image_url} alt={work.title} style={{maxWidth:"100%",maxHeight:"72vh",objectFit:"contain",display:"block"}}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:60,padding:"40px 40px 80px",borderTop:`1px solid ${C.border}`,marginTop:40}}>
+
+      {/* Details */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:48,padding:"28px 40px 80px",borderTop:`1px solid ${C.border}`,marginTop:28}}>
         <div>
-          <div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:44,fontWeight:400,lineHeight:1.05}}>{work.title}</div>
-          <div style={{fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",color:C.orange,marginTop:8,cursor:"pointer",fontFamily:"DM Sans,sans-serif"}} onClick={onBack}>{artist?.name}</div>
-          {work.writeup&&<div style={{fontFamily:"Cormorant Garamond,Georgia,serif",fontSize:18,fontWeight:300,lineHeight:1.8,color:C.charcoal,marginTop:24,maxWidth:540}}>{work.writeup}</div>}
+          {/* Title — smaller, grey, sans-serif */}
+          <div style={{fontFamily:"DM Sans,Helvetica Neue,sans-serif",fontSize:18,fontWeight:400,color:C.charcoal,lineHeight:1.3}}>{work.title}</div>
+          {/* Artist — small, lighter grey */}
+          <div style={{fontFamily:"DM Sans,sans-serif",fontSize:11,color:C.lightGrey,marginTop:6,cursor:"pointer",letterSpacing:"0.04em"}} onClick={onBack}>{artist?.name}</div>
+          {work.writeup&&(
+            <div style={{fontFamily:"DM Sans,Helvetica Neue,sans-serif",fontSize:12,fontWeight:300,lineHeight:1.8,color:C.lightGrey,marginTop:20,maxWidth:500}}>
+              {work.writeup}
+            </div>
+          )}
         </div>
         <div>
           {specs.map(([k,v])=>(
-            <div key={k} style={{padding:"14px 0",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-              <span style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey}}>{k}</span>
-              <span style={{fontFamily:"Cormorant Garamond,serif",fontSize:16,color:C.charcoal,textAlign:"right"}}>
+            <div key={k} style={{padding:"10px 0",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <span style={{fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:C.lightGrey,fontFamily:"DM Sans,sans-serif"}}>{k}</span>
+              <span style={{fontFamily:"DM Sans,sans-serif",fontSize:12,color:C.grey,textAlign:"right"}}>
                 {k==="Availability"?<AvailBadge value={v}/>:v}
               </span>
             </div>
           ))}
-          <div style={{marginTop:24,border:`1px solid ${C.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
-            <span style={{fontSize:10,color:C.grey,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{shareUrl}</span>
+          <div style={{marginTop:20,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:9,color:C.lightGrey,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,fontFamily:"DM Sans,sans-serif"}}>{shareUrl}</span>
             <button onClick={()=>{navigator.clipboard.writeText(shareUrl);setCopied(true);setTimeout(()=>setCopied(false),2000);}}
-              style={{background:copied?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"8px 14px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",whiteSpace:"nowrap",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>
+              style={{background:copied?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"7px 12px",fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",whiteSpace:"nowrap",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s",flexShrink:0}}>
               {copied?"Copied!":"Copy Link"}
             </button>
           </div>
