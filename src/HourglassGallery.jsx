@@ -191,7 +191,7 @@ export default function HourglassGallery() {
         </nav>
       )}
 
-      {screen==="home"    && <HomeScreen    artists={artists} artworks={artworks} search={search} setSearch={setSearch} onSelectArtist={navToArtist}/>}
+      {screen==="home"    && <HomeScreen    artists={artists} artworks={artworks} search={search} setSearch={setSearch} onSelectArtist={navToArtist} onSelectWork={navToWork}/>}
       {screen==="artist"  && <ArtistScreen  artists={artists} artworks={artworks} artistId={curArtist} onBack={navHome} onSelectWork={navToWork}/>}
       {screen==="artwork" && <ArtworkScreen artists={artists} artworks={artworks} artworkId={curWork} onBack={()=>{setScreen("artist");window.scrollTo(0,0);}}/>}
       {screen==="admin"   && <AdminScreen   artists={artists} artworks={artworks} setArtists={setArtists} setArtworks={setArtworks} onBack={navHome} reload={loadData}/>}
@@ -255,31 +255,83 @@ function ErrMsg({text}){
 // ═══════════════════════════════════════════
 // HOME
 // ═══════════════════════════════════════════
-function HomeScreen({artists,artworks,search,setSearch,onSelectArtist}){
-  const filtered=artists.filter(a=>a.name.toLowerCase().includes(search.toLowerCase()));
+function HomeScreen({artists,artworks,search,setSearch,onSelectArtist,onSelectWork}){
+  // Smart search: parse query into name tokens + size/tag keywords
+  const SIZE_MAP={"large":"lg","big":"lg","xl":"xl","extra large":"xl","small":"sm","tiny":"sm","medium":"md"};
+  const q=search.toLowerCase().trim();
+
+  let filtered, searchMode="artists", matchedArtistIds=[], matchedWorkIds=[];
+
+  if(!q){
+    filtered=artists;
+    searchMode="artists";
+  } else {
+    // Extract size/tag tokens
+    const tokens=q.split(/\s+/);
+    const sizeTags=tokens.map(t=>SIZE_MAP[t]).filter(Boolean);
+    const freeTags=tokens.filter(t=>!["works","work","paintings","pieces","by","show","large","big","small","medium","tiny","xl"].includes(t));
+
+    // Find matching artists by name fragment
+    const artistMatches=artists.filter(a=>freeTags.some(t=>a.name.toLowerCase().includes(t)));
+
+    if(artistMatches.length>0 && (sizeTags.length>0 || tokens.some(t=>["works","work","paintings","pieces"].includes(t))||tokens.length>1)){
+      // Artwork search mode: artist name + optional tags
+      searchMode="artworks";
+      matchedArtistIds=artistMatches.map(a=>a.id);
+      matchedWorkIds=artworks.filter(w=>{
+        if(!matchedArtistIds.includes(w.artist_id)) return false;
+        if(sizeTags.length===0 && freeTags.every(t=>artistMatches.some(a=>a.name.toLowerCase().includes(t)))) return true;
+        // Check size tags
+        if(sizeTags.length>0){
+          const wTags=(w.tags||[]).map(t=>t.toLowerCase());
+          return sizeTags.some(st=>wTags.includes(st));
+        }
+        // Check free tags
+        const nonArtistTokens=freeTags.filter(t=>!artistMatches.some(a=>a.name.toLowerCase().includes(t)));
+        if(nonArtistTokens.length===0) return true;
+        const wTags=(w.tags||[]).map(t=>t.toLowerCase());
+        const wText=`${w.title} ${w.medium} ${w.writeup||""}`.toLowerCase();
+        return nonArtistTokens.some(t=>wTags.includes(t)||wText.includes(t));
+      }).map(w=>w.id);
+      filtered=artistMatches;
+    } else {
+      // Simple artist name filter
+      searchMode="artists";
+      filtered=artists.filter(a=>freeTags.some(t=>a.name.toLowerCase().includes(t)));
+    }
+  }
+
   const groups={};
   filtered.forEach(a=>{const l=a.name[0].toUpperCase();if(!groups[l])groups[l]=[];groups[l].push(a);});
   return (
     <div>
-      <div style={{padding:"48px 40px 40px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-        <div>
-          <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:40,objectFit:"contain",display:"block",outline:`1px solid ${C.border}`}}/>
-        </div>
-        <div style={{textAlign:"right",fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,lineHeight:2.2}}>
-          <div>Visitor Catalogue</div>
-          <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artists.length}</span> Artists</div>
-          <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artworks.length}</span> Works</div>
+      <div style={{padding:"24px 40px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:0}}>
+        <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:40,objectFit:"contain",display:"block",outline:`1px solid ${C.border}`}}/>
+        <div style={{marginTop:14,fontSize:10,letterSpacing:"0.25em",textTransform:"uppercase",color:C.grey}}>Visitor Catalogue</div>
+        <div style={{marginTop:16,display:"flex",gap:40,alignItems:"center"}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:28,color:C.orange,lineHeight:1}}>{artists.length}</div>
+            <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginTop:4}}>Artists</div>
+          </div>
+          <div style={{width:1,height:28,background:C.border}}/>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:28,color:C.orange,lineHeight:1}}>{artworks.length}</div>
+            <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginTop:4}}>Works</div>
+          </div>
         </div>
       </div>
       <div style={{padding:"20px 40px",borderBottom:`1px solid ${C.border}`}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search artists…"
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search by artist, title, tag or e.g. 'Boadi large works'…"
           style={{width:"100%",padding:"12px 0",border:"none",borderBottom:`1px solid ${C.border}`,background:"transparent",fontFamily:"DM Sans,sans-serif",fontSize:14,outline:"none",color:C.black}}/>
       </div>
       <div style={{padding:"24px 40px 16px",fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:C.grey,borderBottom:`1px solid ${C.border}`}}>All Artists — Alphabetical</div>
       <div style={{padding:"0 40px"}}>
         {!filtered.length
           ? <div style={{padding:"80px 0",textAlign:"center",color:C.lightGrey,fontFamily:"Cormorant Garamond,serif",fontSize:28,fontWeight:300}}>No artists found</div>
-          : Object.keys(groups).sort().map(letter=>(
+          : searchMode==="artworks" && matchedWorkIds.length>0
+            ? <WorkSearchResults workIds={matchedWorkIds} artworks={artworks} artists={artists} onSelectArtist={onSelectArtist} onSelectWork={onSelectWork} search={q}/>
+            : Object.keys(groups).sort().map(letter=>(
             <div key={letter}>
               <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:13,fontWeight:300,color:C.lightGrey,padding:"20px 0 8px",borderBottom:`1px solid ${C.border}`}}>{letter}</div>
               {groups[letter].map(a=><ArtistRow key={a.id} artist={a} artworks={artworks} onClick={()=>onSelectArtist(a.id)}/>)}
@@ -291,6 +343,43 @@ function HomeScreen({artists,artworks,search,setSearch,onSelectArtist}){
     </div>
   );
 }
+function WorkSearchResults({workIds,artworks,artists,onSelectArtist,onSelectWork,search}){
+  const works=artworks.filter(w=>workIds.includes(w.id));
+  return(
+    <div>
+      <div style={{padding:"20px 0 12px",fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,borderBottom:`1px solid ${C.border}`}}>
+        {works.length} result{works.length!==1?"s":""} for <em style={{color:C.orange,fontStyle:"normal"}}>"{search}"</em>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:2,paddingTop:2}}>
+        {works.map(w=>{
+          const artist=artists.find(a=>a.id===w.artist_id);
+          return(
+            <div key={w.id} onClick={()=>onSelectWork(w.id)}
+              style={{position:"relative",background:C.border,cursor:"pointer",overflow:"hidden"}}>
+              <div style={{aspectRatio:"1",overflow:"hidden"}}>
+                <img src={w.image_url} alt={w.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block",transition:"transform 0.4s"}}
+                  onMouseOver={e=>e.currentTarget.style.transform="scale(1.04)"}
+                  onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}
+                  onError={e=>{e.target.style.display="none";}}/>
+              </div>
+              <div style={{padding:"12px 14px 14px",background:C.white,borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:18,fontWeight:400,color:C.black}}>{w.title}</div>
+                <div style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:C.orange,marginTop:4,cursor:"pointer"}}
+                  onClick={e=>{e.stopPropagation();onSelectArtist(w.artist_id);}}>{artist?.name}</div>
+                {w.tags&&w.tags.length>0&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:8}}>
+                    {w.tags.map(t=><span key={t} style={{fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",padding:"2px 6px",background:C.bg,border:`1px solid ${C.border}`,color:C.grey}}>{t}</span>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ArtistRow({artist,artworks,onClick}){
   const [h,setH]=useState(false);
   const count=artworks.filter(w=>w.artist_id===artist.id).length;
