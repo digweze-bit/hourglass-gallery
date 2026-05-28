@@ -355,16 +355,17 @@ function ArtworksList({artists,artworks,reload}){
       let image_url=editing.image_url;
       if(_newImageData) image_url=await sbUploadImage("artwork-images",_newImageData);
       await sbUpdate("artworks",id,{
-        artist_id:   editing.artist_id,
-        title:       editing.title.trim(),
-        year:        editing.year||null,
-        medium:      editing.medium||null,
-        dimensions:  editing.dimensions||null,
-        series:      editing.series||null,
-        availability:editing.availability,
-        writeup:     editing.writeup||null,
-        price:       editing.price||null,
-        tags:        editing.tags||[],
+        artist_id:     editing.artist_id,
+        title:         editing.title.trim(),
+        year:          editing.year||null,
+        medium:        editing.medium||null,
+        dimensions:    editing.dimensions||null,
+        series:        editing.series||null,
+        availability:  editing.availability,
+        writeup:       editing.writeup||null,
+        price:         editing.price||null,
+        tags:          editing.tags||[],
+        image_position:editing.image_position||"center",
         image_url,
       });
       await reload();
@@ -427,6 +428,7 @@ function ArtworksList({artists,artworks,reload}){
             <FSelect label="Availability" value={editing.availability||"Available"} onChange={f("availability")}
               options={["Available","Sold","On Loan","NFS"]}/>
             <FTextarea label="Write-up" value={editing.writeup||""} onChange={f("writeup")} placeholder="Description…"/>
+            <PositionToggle value={editing.image_position||"center"} onChange={v=>setEditing(p=>({...p,image_position:v}))}/>
             <TagInput tags={editing.tags||[]} onChange={tags=>setEditing(p=>({...p,tags}))}/>
           </div>
         </div>
@@ -457,7 +459,7 @@ function BatchUpload({artists,reload}){
     let parsedArtist="",title="",medium="",dimensions="",year="",price="";
     if(allParts.length>=2){parsedArtist=allParts[0]||"";title=allParts[1]||"";medium=allParts[2]||"";dimensions=allParts[3]||"";year=allParts[4]||"";price=allParts.slice(5).join(",").trim();}
     else{title=rawName.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());}
-    return{id:"b"+Date.now()+Math.random(),image:dataUrl,parsedArtist,title,medium,dimensions,year,price,imageDimensions:`${origW} × ${origH} px`,compressInfo:`${newW}×${newH}px · ${kb}KB`,availability:"Available",writeup:"",tags:[]};
+    return{id:"b"+Date.now()+Math.random(),image:dataUrl,parsedArtist,title,medium,dimensions,year,price,imageDimensions:`${origW} × ${origH} px`,compressInfo:`${newW}×${newH}px · ${kb}KB`,availability:"Available",writeup:"",tags:[],image_position:"center"};
   };
 
   const addFiles=async files=>{
@@ -486,16 +488,17 @@ function BatchUpload({artists,reload}){
       try{
         const image_url=await sbUploadImage("artwork-images",it.image);
         await sbInsert("artworks",{
-          artist_id: it.resolvedArtistId||artistId,
-          title:     it.title||"Untitled",
-          year:      it.year||null,
-          medium:    it.medium||null,
-          dimensions:it.dimensions||null,
-          series:    null,
-          availability: it.availability||"Available",
-          writeup:   it.writeup||null,
-          price:     it.price||null,
-          tags:      it.tags||[],
+          artist_id:     it.resolvedArtistId||artistId,
+          title:         it.title||"Untitled",
+          year:          it.year||null,
+          medium:        it.medium||null,
+          dimensions:    it.dimensions||null,
+          series:        null,
+          availability:  it.availability||"Available",
+          writeup:       it.writeup||null,
+          price:         it.price||null,
+          tags:          it.tags||[],
+          image_position:it.image_position||"center",
           image_url,
         });
       }catch(e){failed++;}
@@ -583,7 +586,10 @@ function BatchCard({item,onUpdate,onRemove,artists}){
         <FInput label="NGN Price" value={item.price||""} onChange={u("price")} placeholder="e.g. 4,500,000"/>
         <FTextarea label="Art Write-up" value={item.writeup} onChange={u("writeup")} placeholder="Description or note…"/>
       </div>
-      <div><TagInput tags={item.tags||[]} onChange={tags=>onUpdate(item.id,"tags",tags)}/></div>
+      <div>
+        <PositionToggle value={item.image_position||"center"} onChange={v=>onUpdate(item.id,"image_position",v)}/>
+        <TagInput tags={item.tags||[]} onChange={tags=>onUpdate(item.id,"tags",tags)}/>
+      </div>
     </div>}
   </div>);
 }
@@ -591,6 +597,31 @@ function BatchCard({item,onUpdate,onRemove,artists}){
 
 // ── Tag Input ─────────────────────────────
 const SIZE_TAGS=[{value:"sm",label:"Small"},{value:"md",label:"Medium"},{value:"lg",label:"Large"},{value:"xl",label:"Extra Large"}];
+
+
+// ── Image Position Toggle ─────────────────
+function PositionToggle({value,onChange}){
+  const opts=[{v:"center",label:"Centre"},{v:"top",label:"Top"}];
+  return(
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>Thumbnail Position</label>
+      <div style={{display:"flex",gap:0}}>
+        {opts.map(o=>(
+          <button key={o.v} onClick={()=>onChange(o.v)}
+            style={{flex:1,padding:"8px 0",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",cursor:"pointer",
+              border:`1px solid ${value===o.v?C.orange:C.border}`,
+              background:value===o.v?"#fff8f5":C.white,
+              color:value===o.v?C.orange:C.grey,
+              marginRight:o.v==="center"?-1:0,
+              transition:"all 0.15s"}}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div style={{fontSize:10,color:C.lightGrey,marginTop:6}}>Controls vertical crop position in thumbnail grid</div>
+    </div>
+  );
+}
 
 function TagInput({tags,onChange}){
   const [input,setInput]=useState("");
@@ -681,7 +712,7 @@ function AddArtistForm({reload}){
 }
 
 function AddArtworkForm({artists,reload}){
-  const [form,setForm]=useState({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:"",tags:[]});
+  const [form,setForm]=useState({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:"",tags:[],image_position:"center"});
   const [ok,setOk]=useState(false);const [err,setErr]=useState("");const [saving,setSaving]=useState(false);
   const f=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
   const handleImage=async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());const {dataUrl,origW,origH}=await compressImage(file);setForm(p=>({...p,_imageData:dataUrl,title:p.title||name,dimensions:p.dimensions||`${origW} × ${origH} px`}));};
@@ -703,6 +734,7 @@ function AddArtworkForm({artists,reload}){
         writeup:form.writeup||null,
         price:form.price||null,
         tags:form.tags||[],
+        image_position:form.image_position||"center",
         image_url,
       });
       await reload();
@@ -736,7 +768,10 @@ function AddArtworkForm({artists,reload}){
         <FTextarea label="Write-up" value={form.writeup} onChange={f("writeup")} placeholder="Description or note…"/>
       </div>
     </div>
-    <TagInput tags={form.tags} onChange={tags=>setForm(p=>({...p,tags}))}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+      <PositionToggle value={form.image_position} onChange={v=>setForm(p=>({...p,image_position:v}))}/>
+      <TagInput tags={form.tags} onChange={tags=>setForm(p=>({...p,tags}))}/>
+    </div>
     <Btn onClick={save}>{saving?"Uploading…":"Save Artwork"}</Btn>
   </div>);
 }
