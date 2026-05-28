@@ -144,7 +144,6 @@ export default function HourglassGallery() {
   const [screen,    setScreen]    = useState("home");
   const [curArtist, setCurArtist] = useState(null);
   const [curWork,   setCurWork]   = useState(null);
-  const [kiosk,     setKiosk]     = useState(false);
   const [search,    setSearch]    = useState("");
 
   // ── Load data from Supabase ──
@@ -183,24 +182,14 @@ export default function HourglassGallery() {
   return (
     <div style={{fontFamily:"DM Sans,Helvetica Neue,Arial,sans-serif",background:C.bg,color:C.black,minHeight:"100vh"}}>
       {error && <div style={{background:"#fff0f0",borderBottom:"1px solid #ffcccc",padding:"10px 40px",fontSize:12,color:"#cc0000"}}>{error}</div>}
-      {kiosk && (
-        <div style={{background:C.black,color:C.white,padding:"8px 40px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase"}}>
-          <span>Hourglass Gallery — Visitor Catalogue</span>
-          <span style={{color:C.orange,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{width:6,height:6,borderRadius:"50%",background:C.orange,display:"inline-block"}}/>Gallery Display Active
-          </span>
-        </div>
+
+      {screen!=="home" && (
+        <nav style={{position:"sticky",top:0,zIndex:100,background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 40px",height:48,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div onClick={navHome} style={{cursor:"pointer"}}>
+            <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:24,objectFit:"contain",display:"block"}}/>
+          </div>
+        </nav>
       )}
-      <nav style={{position:"sticky",top:0,zIndex:100,background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 40px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div onClick={navHome} style={{cursor:"pointer"}}>
-          <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:16,objectFit:"contain",display:"block"}}/>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:24}}>
-          <NavBtn onClick={navHome} active={screen==="home"}>Artists</NavBtn>
-          <NavBtn onClick={()=>setKiosk(k=>!k)}>{kiosk?"Exit Kiosk":"Kiosk Mode"}</NavBtn>
-          <Btn onClick={navAdmin}>Admin</Btn>
-        </div>
-      </nav>
 
       {screen==="home"    && <HomeScreen    artists={artists} artworks={artworks} search={search} setSearch={setSearch} onSelectArtist={navToArtist}/>}
       {screen==="artist"  && <ArtistScreen  artists={artists} artworks={artworks} artistId={curArtist} onBack={navHome} onSelectWork={navToWork}/>}
@@ -272,16 +261,14 @@ function HomeScreen({artists,artworks,search,setSearch,onSelectArtist}){
   filtered.forEach(a=>{const l=a.name[0].toUpperCase();if(!groups[l])groups[l]=[];groups[l].push(a);});
   return (
     <div>
-      <div style={{borderBottom:`1px solid ${C.border}`}}>
-        <div style={{padding:"40px 40px 32px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"center"}}>
-          <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:40,objectFit:"contain",display:"block"}}/>
+      <div style={{padding:"48px 40px 40px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+        <div>
+          <img src={LOGO_DATA_URL} alt="Hourglass Gallery" style={{height:40,objectFit:"contain",display:"block",outline:`1px solid ${C.border}`}}/>
         </div>
-        <div style={{padding:"24px 40px",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
-          <div style={{textAlign:"right",fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,lineHeight:2.2}}>
-            <div>Visitor Catalogue</div>
-            <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artists.length}</span> Artists</div>
-            <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artworks.length}</span> Works</div>
-          </div>
+        <div style={{textAlign:"right",fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,lineHeight:2.2}}>
+          <div>Visitor Catalogue</div>
+          <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artists.length}</span> Artists</div>
+          <div><span style={{color:C.orange,fontFamily:"Cormorant Garamond,serif",fontSize:18}}>{artworks.length}</span> Works</div>
         </div>
       </div>
       <div style={{padding:"20px 40px",borderBottom:`1px solid ${C.border}`}}>
@@ -397,7 +384,7 @@ function ArtworkScreen({artists,artworks,artworkId,onBack}){
   const [copied,setCopied]=useState(false);
   const shareUrl=`${window.location.origin}${window.location.pathname}?artwork=${artworkId}`;
   if(!work) return null;
-  const specs=[["Artist",artist?.name],["Year",work.year],["Medium",work.medium],["Dimensions",work.dimensions],["Series / Edition",work.series],["Availability",work.availability]].filter(([,v])=>v);
+  const specs=[["Artist",artist?.name],["Year",work.year],["Medium",work.medium],["Dimensions",work.dimensions?`${work.dimensions} in`:null],["Series / Edition",work.series],["Availability",work.availability]].filter(([,v])=>v);
   return (
     <div>
       <BackBtn onClick={onBack} label={artist?.name||"Artist"}/>
@@ -535,17 +522,58 @@ function BatchUpload({artists,setArtworks,reload}){
 
   const parseFile=async file=>{
     const rawName=file.name.replace(/\.[^.]+$/,"");
-    const title=rawName.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
     const {dataUrl,origW,origH,newW,newH,kb}=await compressImage(file);
-    return {id:"b"+Date.now()+Math.random(),image:dataUrl,title,year:"",medium:"",
-      dimensions:`${origW} × ${origH} px`,compressInfo:`${newW}×${newH}px · ${kb}KB`,
-      availability:"Available",writeup:""};
+
+    // Structured filename format:
+    // Artist, Title, Medium, Dimensions, Year, Price
+    // e.g. "Amara Osei, Threshold I, Oil on canvas, 150x120cm, 2022, 4,500,000"
+    // Price may contain commas so we take only the FIRST 5 comma-splits,
+    // then treat everything after the 5th comma as the price field.
+    const raw=rawName;
+    let parsedArtist="", title="", medium="", dimensions="", year="", price="";
+
+    // Split into max 6 parts — price is rejoined if it contains commas
+    const allParts=raw.split(",").map(s=>s.trim());
+
+    if(allParts.length>=2){
+      parsedArtist = allParts[0] || "";
+      title        = allParts[1] || "";
+      medium       = allParts[2] || "";
+      dimensions   = allParts[3] || "";
+      year         = allParts[4] || "";
+      // Everything from index 5 onwards rejoined = price (handles 4,500,000)
+      price        = allParts.slice(5).join(",").trim();
+    } else {
+      // Fallback: plain filename as title
+      title=raw.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+    }
+
+    return {
+      id:"b"+Date.now()+Math.random(),
+      image:dataUrl,
+      parsedArtist,
+      title, medium, dimensions,
+      year, price,
+      imageDimensions:`${origW} × ${origH} px`,
+      compressInfo:`${newW}×${newH}px · ${kb}KB`,
+      availability:"Available",
+      writeup:"",
+    };
   };
 
   const addFiles=async files=>{
     const arr=Array.from(files).filter(f=>f.type.startsWith("image/"));
     const parsed=await Promise.all(arr.map(parseFile));
-    setItems(prev=>[...prev,...parsed]);
+    // Auto-resolve parsedArtist string → artist id (case-insensitive partial match)
+    const resolved=parsed.map(item=>{
+      if(!item.parsedArtist) return item;
+      const match=artists.find(a=>
+        a.name.toLowerCase().includes(item.parsedArtist.toLowerCase()) ||
+        item.parsedArtist.toLowerCase().includes(a.name.toLowerCase())
+      );
+      return {...item, resolvedArtistId:match?match.id:"", resolvedArtistName:match?match.name:""};
+    });
+    setItems(prev=>[...prev,...resolved]);
   };
 
   const applyShared=()=>setItems(prev=>prev.map(it=>({...it,
@@ -564,10 +592,12 @@ function BatchUpload({artists,setArtworks,reload}){
       try{
         const imageUrl=await sbUploadImage("artwork-images",null,it.image);
         await sbInsert("artworks",{
-          artist_id:artistId, title:it.title, year:it.year||null,
+          artist_id:it.resolvedArtistId||artistId,
+          title:it.title, year:it.year||null,
           medium:it.medium||null, dimensions:it.dimensions||null,
           series:it.series||null, availability:it.availability,
           writeup:it.writeup||null, image_url:imageUrl,
+          price:it.price||null,
         });
       } catch(e){ failed++; }
       setProgress({done:i+1,total:items.length});
@@ -605,7 +635,7 @@ function BatchUpload({artists,setArtworks,reload}){
         <div style={{fontSize:28,color:C.lightGrey,marginBottom:10}}>⊕</div>
         <div style={{fontSize:14,color:C.grey,fontFamily:"Cormorant Garamond,serif",fontWeight:300}}>Drop multiple images here, or click to select files</div>
         <div style={{fontSize:10,color:C.lightGrey,marginTop:6,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-          Auto-compressed · Uploaded to Supabase Storage · Titles from filenames
+          Auto-compressed · Filename format: Artist, Title, Medium, Dimensions, Year, Price
         </div>
       </div>
 
@@ -633,8 +663,13 @@ function BatchUpload({artists,setArtworks,reload}){
               <Btn onClick={saveAll}>Upload All {items.length} to Supabase →</Btn>
             </div>
           </div>
+          <div style={{display:"grid",gridTemplateColumns:"72px 1fr 140px 160px 80px 100px 110px 100px 40px",padding:"6px 0",marginBottom:2,borderBottom:`1px solid ${C.border}`}}>
+            {["","Title / Artist","Artist","Medium","Year","Avail.","NGN Price","",""].map((h,i)=>(
+              <div key={i} style={{padding:"0 10px",fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:C.lightGrey}}>{h}</div>
+            ))}
+          </div>
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            {items.map((it,idx)=><BatchCard key={it.id} item={it} index={idx} onUpdate={update} onRemove={remove}/>)}
+            {items.map((it,idx)=><BatchCard key={it.id} item={it} index={idx} onUpdate={update} onRemove={remove} artists={artists}/>)}
           </div>
           <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"flex-end"}}>
             <Btn onClick={saveAll}>Upload All {items.length} to Supabase →</Btn>
@@ -645,47 +680,76 @@ function BatchUpload({artists,setArtworks,reload}){
   );
 }
 
-function BatchCard({item,index,onUpdate,onRemove}){
+function BatchCard({item,index,onUpdate,onRemove,artists}){
   const [exp,setExp]=useState(false);
-  const u=f=>e=>onUpdate(item.id,f,e.target.value);
+  const u=f=>e=>onUpdate(item.id,f,typeof e==="string"?e:e.target.value);
+  const artistUnmatched=item.parsedArtist&&!item.resolvedArtistId;
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.white}}>
-      <div style={{display:"grid",gridTemplateColumns:"72px 1fr 160px 130px 130px 100px 40px",alignItems:"center"}}>
+    <div style={{border:`1px solid ${artistUnmatched?"#ffcccc":C.border}`,background:C.white}}>
+      <div style={{display:"grid",gridTemplateColumns:"72px 1fr 140px 160px 80px 100px 110px 100px 40px",alignItems:"center"}}>
         <img src={item.image} alt="" style={{width:72,height:72,objectFit:"cover",display:"block",borderRight:`1px solid ${C.border}`}}/>
-        <div style={{padding:"0 16px"}}>
-          <input value={item.title} onChange={u("title")} style={{width:"100%",border:"none",borderBottom:`1px solid ${C.border}`,padding:"4px 0",fontFamily:"Cormorant Garamond,serif",fontSize:18,outline:"none",background:"transparent",color:C.black}}/>
-          <div style={{fontSize:10,color:C.lightGrey,marginTop:4}}>
-            {item.dimensions}
-            {item.compressInfo&&<span style={{color:"#1a7a3c",marginLeft:8}}>→ {item.compressInfo}</span>}
-          </div>
+
+        {/* Title + artist match */}
+        <div style={{padding:"0 12px"}}>
+          <input value={item.title} onChange={u("title")} placeholder="Title"
+            style={{width:"100%",border:"none",borderBottom:`1px solid ${C.border}`,padding:"4px 0",fontFamily:"Cormorant Garamond,serif",fontSize:16,outline:"none",background:"transparent",color:C.black}}/>
+          {item.resolvedArtistName
+            ? <div style={{fontSize:10,color:"#1a7a3c",marginTop:3,letterSpacing:"0.06em"}}>✓ {item.resolvedArtistName}</div>
+            : item.parsedArtist
+              ? <div style={{fontSize:10,color:"#cc3333",marginTop:3}}>⚠ No match: "{item.parsedArtist}"</div>
+              : <div style={{fontSize:10,color:C.lightGrey,marginTop:3}}>{item.compressInfo}</div>
+          }
         </div>
-        <div style={{padding:"0 12px",borderLeft:`1px solid ${C.border}`}}>
+
+        {/* Artist override dropdown */}
+        <div style={{padding:"0 10px",borderLeft:`1px solid ${C.border}`}}>
+          <select value={item.resolvedArtistId||""} onChange={e=>onUpdate(item.id,"resolvedArtistId",e.target.value)}
+            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:11,outline:"none",background:"transparent",color:artistUnmatched?C.orange:C.charcoal,appearance:"none"}}>
+            <option value="">— artist —</option>
+            {artists.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+
+        {/* Medium */}
+        <div style={{padding:"0 10px",borderLeft:`1px solid ${C.border}`}}>
           <input value={item.medium} onChange={u("medium")} placeholder="Medium"
-            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:12,outline:"none",background:"transparent",color:C.charcoal}}/>
+            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:11,outline:"none",background:"transparent",color:C.charcoal}}/>
         </div>
-        <div style={{padding:"0 12px",borderLeft:`1px solid ${C.border}`}}>
+
+        {/* Year */}
+        <div style={{padding:"0 10px",borderLeft:`1px solid ${C.border}`}}>
           <input value={item.year} onChange={u("year")} placeholder="Year"
-            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:12,outline:"none",background:"transparent",color:C.charcoal}}/>
+            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:11,outline:"none",background:"transparent",color:C.charcoal}}/>
         </div>
-        <div style={{padding:"0 12px",borderLeft:`1px solid ${C.border}`}}>
+
+        {/* Availability */}
+        <div style={{padding:"0 10px",borderLeft:`1px solid ${C.border}`}}>
           <select value={item.availability} onChange={u("availability")}
-            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:12,outline:"none",background:"transparent",color:C.charcoal,appearance:"none"}}>
+            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:11,outline:"none",background:"transparent",color:C.charcoal,appearance:"none"}}>
             {["Available","Sold","On Loan","NFS"].map(o=><option key={o}>{o}</option>)}
           </select>
         </div>
-        <div style={{padding:"0 12px",borderLeft:`1px solid ${C.border}`}}>
-          <button onClick={()=>setExp(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:C.orange,fontFamily:"DM Sans,sans-serif",whiteSpace:"nowrap"}}>
-            {exp?"▲ Less":"▼ More"}
-          </button>
+
+        {/* Price */}
+        <div style={{padding:"0 10px",borderLeft:`1px solid ${C.border}`}}>
+          <input value={item.price||""} onChange={u("price")} placeholder="e.g. 4,500,000"
+            style={{width:"100%",border:"none",padding:"4px 0",fontFamily:"DM Sans,sans-serif",fontSize:11,outline:"none",background:"transparent",color:C.charcoal}}/>
         </div>
-        <div style={{padding:"0 8px",borderLeft:`1px solid ${C.border}`,textAlign:"center"}}>
+
+        {/* More / Remove */}
+        <div style={{padding:"0 8px",borderLeft:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:6}}>
+          <button onClick={()=>setExp(e=>!e)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:C.orange,fontFamily:"DM Sans,sans-serif",whiteSpace:"nowrap"}}>
+            {exp?"▲":"▼"}
+          </button>
           <button onClick={()=>onRemove(item.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:C.lightGrey,lineHeight:1}}>×</button>
         </div>
       </div>
+
       {exp&&(
-        <div style={{padding:"16px 20px",borderTop:`1px solid ${C.border}`,background:"#fcfcfa",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          <FTextarea label="Art Write-up" value={item.writeup} onChange={u("writeup")} placeholder="Description, provenance, or note…"/>
-          <FInput label="Dimensions (override)" value={item.dimensions} onChange={u("dimensions")} placeholder="e.g. 120 × 90 cm"/>
+        <div style={{padding:"16px 20px",borderTop:`1px solid ${C.border}`,background:"#fcfcfa",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+          <FInput label="Dimensions" value={item.dimensions} onChange={u("dimensions")} placeholder="e.g. 120 × 90 cm"/>
+          <FInput label="NGN Price" value={item.price||""} onChange={u("price")} placeholder="e.g. 4,500,000"/>
+          <FTextarea label="Art Write-up" value={item.writeup} onChange={u("writeup")} placeholder="Description or note…"/>
         </div>
       )}
     </div>
