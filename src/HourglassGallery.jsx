@@ -421,11 +421,16 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
   const qrUrl=`${window.location.origin}${window.location.pathname}?artist=${artistId}`;
   if(!artist) return null;
 
+  // Collect unique mediums for this artist's works
+  const mediums=[...new Set(works.map(w=>w.medium).filter(Boolean))].sort();
+  const [mediumFilter,setMediumFilter]=useState("all");
+  const filtered=mediumFilter==="all"?works:works.filter(w=>w.medium===mediumFilter);
+
   return (
     <div>
       <BackBtn onClick={onBack} label="All Artists"/>
 
-      {/* ── Artist name header — minimal, sans-serif, grey ── */}
+      {/* ── Artist name header ── */}
       <div style={{padding:"24px 40px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
         <div>
           <div style={{fontFamily:"DM Sans,Helvetica Neue,sans-serif",fontSize:22,fontWeight:300,color:C.charcoal,letterSpacing:"0.02em"}}>{artist.name}</div>
@@ -435,7 +440,6 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
             </div>
           )}
         </div>
-        {/* QR + copy — compact, right-aligned */}
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           {artist.link&&<a href={artist.link} target="_blank" rel="noreferrer"
             style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:C.lightGrey,textDecoration:"none",fontFamily:"DM Sans,sans-serif"}}>
@@ -449,20 +453,33 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
         </div>
       </div>
 
+      {/* ── Medium filter ── */}
+      {mediums.length>1&&(
+        <div style={{padding:"0 40px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:0,overflowX:"auto"}}>
+          {["all",...mediums].map(m=>(
+            <button key={m} onClick={()=>setMediumFilter(m)}
+              style={{background:"none",border:"none",borderBottom:mediumFilter===m?`2px solid ${C.orange}`:"2px solid transparent",cursor:"pointer",padding:"10px 16px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:mediumFilter===m?C.black:C.grey,whiteSpace:"nowrap",transition:"all 0.2s"}}>
+              {m==="all"?`All (${works.length})`:m}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Works grid ── */}
       <div style={{padding:"24px 40px"}}>
         <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginBottom:16,fontFamily:"DM Sans,sans-serif"}}>
-          {works.length} Work{works.length!==1?"s":""}
+          {filtered.length} Work{filtered.length!==1?"s":""}
+          {mediumFilter!=="all"&&<span style={{color:C.orange}}> — {mediumFilter}</span>}
         </div>
-        {!works.length
-          ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works yet.</div>
+        {!filtered.length
+          ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works match this filter.</div>
           : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:2}}>
-              {works.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
+              {filtered.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
             </div>
         }
       </div>
 
-      {/* ── Biography — bottom of page, small sans-serif grey ── */}
+      {/* ── Biography ── */}
       {artist.bio&&(
         <div style={{padding:"32px 40px 60px",borderTop:`1px solid ${C.border}`,maxWidth:640}}>
           <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.black,marginBottom:12,fontFamily:"DM Sans,sans-serif"}}>Biography</div>
