@@ -157,6 +157,12 @@ export default function HourglassAdmin() {
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [tab,setTab]=useState("artists");
+  const [filterArtistId,setFilterArtistId]=useState("");
+
+  const goToArtistWorks=(artistId)=>{
+    setFilterArtistId(artistId);
+    setTab("artworks");
+  };
 
   if(!authed) return <LoginScreen onLogin={()=>setAuthed(true)}/>;
 
@@ -229,7 +235,7 @@ function Modal({title,onClose,children}){
   );
 }
 
-function ArtistsList({artists,artworks,reload}){
+function ArtistsList({artists,artworks,reload,onViewWorks}){
   const [busy,setBusy]=useState("");
   const [editing,setEditing]=useState(null); // artist object being edited
   const [saving,setSaving]=useState(false);
@@ -282,7 +288,9 @@ function ArtistsList({artists,artworks,reload}){
           <div key={a.id} style={{background:C.white,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <div style={{minWidth:0}}>
               <div style={{fontFamily:"Cormorant Garamond,serif",fontSize:15,fontWeight:400,color:C.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</div>
-              <div style={{fontSize:10,color:C.lightGrey,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.medium} · {count} work{count!==1?"s":""}</div>
+              <div style={{fontSize:10,color:C.lightGrey,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                  {a.medium} · <span onClick={e=>{e.stopPropagation();onViewWorks(a.id);}} style={{color:C.orange,cursor:"pointer",textDecoration:"underline"}}>{count} work{count!==1?"s":""}</span>
+                </div>
             </div>
             <div style={{display:"flex",gap:10,flexShrink:0}}>
               <button onClick={()=>openEdit(a)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.orange,whiteSpace:"nowrap"}}>Edit</button>
@@ -324,13 +332,15 @@ function ArtistsList({artists,artworks,reload}){
   </>);
 }
 
-function ArtworksList({artists,artworks,reload}){
+function ArtworksList({artists,artworks,reload,initFilterArtistId}){
   const [busy,setBusy]=useState("");
   const [editing,setEditing]=useState(null);
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [selected,setSelected]=useState(new Set());
   const [batchDeleting,setBatchDeleting]=useState(false);
+  const [filterArtist,setFilterArtist]=useState(initFilterArtistId||"");
+  const [sortBy,setSortBy]=useState("recent");
 
   const toggleSelect=id=>setSelected(prev=>{const s=new Set(prev);s.has(id)?s.delete(id):s.add(id);return s;});
   const selectAll=()=>setSelected(new Set(artworks.map(w=>w.id)));
@@ -393,6 +403,24 @@ function ArtworksList({artists,artworks,reload}){
   };
 
   return(<>
+    {/* Filter + Sort bar */}
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+      <select value={filterArtist} onChange={e=>{setFilterArtist(e.target.value);setSelected(new Set());}}
+        style={{padding:"8px 14px",border:`1px solid ${C.border}`,fontFamily:"DM Sans,sans-serif",fontSize:12,outline:"none",appearance:"none",background:C.white,color:C.black,minWidth:200}}>
+        <option value="">All Artists</option>
+        {[...artists].sort((a,b)=>a.name.localeCompare(b.name)).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+      </select>
+      <div style={{display:"flex",gap:0,border:`1px solid ${C.border}`}}>
+        {[{v:"recent",l:"Most Recent"},{v:"artist",l:"By Artist"}].map(s=>(
+          <button key={s.v} onClick={()=>setSortBy(s.v)}
+            style={{background:sortBy===s.v?C.black:C.white,color:sortBy===s.v?C.white:C.grey,border:"none",cursor:"pointer",padding:"8px 14px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"all 0.15s"}}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      {filterArtist&&<button onClick={()=>setFilterArtist("")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:C.grey,fontFamily:"DM Sans,sans-serif",letterSpacing:"0.1em",textTransform:"uppercase"}}>Clear filter ×</button>}
+    </div>
+
     {/* Batch controls */}
     <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12,padding:"10px 0"}}>
       <button onClick={selectAll} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:C.grey}}>Select All</button>
@@ -409,8 +437,13 @@ function ArtworksList({artists,artworks,reload}){
     <table style={{width:"100%",borderCollapse:"collapse"}}>
       <thead><tr>{["","","Title","Artist","Year","Medium",""].map((h,i)=><th key={i} style={{fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:C.grey,padding:"10px 12px",borderBottom:`1px solid ${C.border}`,textAlign:"left"}}>{h}</th>)}</tr></thead>
       <tbody>
-        {!artworks.length&&<tr><td colSpan={7} style={{padding:24,color:C.grey}}>No artworks yet.</td></tr>}
-        {artworks.map(w=>{
+        {(()=>{
+          let display=[...artworks];
+          if(filterArtist) display=display.filter(w=>w.artist_id===filterArtist);
+          if(sortBy==="artist") display.sort((a,b)=>{const na=artists.find(x=>x.id===a.artist_id)?.name||"";const nb=artists.find(x=>x.id===b.artist_id)?.name||"";return na.localeCompare(nb);});
+          else display.sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+          if(!display.length) return <tr><td colSpan={7} style={{padding:24,color:C.grey}}>{filterArtist?"No artworks for this artist.":"No artworks yet."}</td></tr>;
+          return display.map(w=>{
           const art=artists.find(a=>a.id===w.artist_id);
           const isSel=selected.has(w.id);
           return<tr key={w.id} style={{background:isSel?"#fff8f5":"transparent"}}>
@@ -428,7 +461,7 @@ function ArtworksList({artists,artworks,reload}){
               {busy===w.id?<span style={{fontSize:11,color:C.grey}}>Deleting…</span>:<DangerBtn onClick={()=>del(w.id)}>Delete</DangerBtn>}
             </td>
           </tr>;
-        })}
+        });})()}
       </tbody>
     </table>
 
