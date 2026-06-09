@@ -43,7 +43,12 @@ function compressImage(file) {
 }
 
 const sbHeaders={"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
-async function sbQuery(table,opts={}){let url=`${SB_URL}/rest/v1/${table}?`;if(opts.select)url+=`select=${opts.select}&`;if(opts.order)url+=`order=${opts.order}&`;const res=await fetch(url,{headers:sbHeaders});if(!res.ok)throw new Error(await res.text());return res.json();}
+async function sbQuery(table,queryString=""){
+  const url=`${SB_URL}/rest/v1/${table}?${queryString}`;
+  const res=await fetch(url,{headers:{...sbHeaders,"Range":"0-9999"}});
+  if(!res.ok)throw new Error(await res.text());
+  return res.json();
+}
 async function sbInsert(table,data){
   // Strip undefined values so missing columns don't cause schema errors
   const clean=Object.fromEntries(Object.entries(data).filter(([,v])=>v!==undefined));
