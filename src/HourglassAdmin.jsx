@@ -58,7 +58,21 @@ async function sbUpdate(table,id,data){
   if(!res.ok) throw new Error(await res.text());
   return res.json();
 }
-async function sbUploadImage(bucket,dataUrl){const res=await fetch(dataUrl);const blob=await res.blob();const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;const up=await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path}`,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"image/jpeg","x-upsert":"true"},body:blob});if(!up.ok)throw new Error(await up.text());return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;}
+async function sbUploadImage(bucket,dataUrl){
+  const res=await fetch(dataUrl);
+  const blob=await res.blob();
+  const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+  const up=await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path}`,{
+    method:"POST",
+    headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"image/jpeg","x-upsert":"true"},
+    body:blob
+  });
+  if(!up.ok){
+    const errText=await up.text();
+    throw new Error(`Storage upload failed: ${errText}`);
+  }
+  return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
 
 function Btn({onClick,children}){const [h,setH]=useState(false);return <button onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)} style={{background:h?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>{children}</button>;}
 function DangerBtn({onClick,children}){return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",color:"#cc3333",fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif"}}>{children}</button>;}
@@ -556,20 +570,20 @@ function BatchUpload({artists,reload}){
       const it=items[i];
       try{
         const image_url=await sbUploadImage("artwork-images",it.image);
-        await sbInsert("artworks",{
-          artist_id:     it.resolvedArtistId||artistId,
-          title:         it.title||"Untitled",
-          year:          it.year||null,
-          medium:        it.medium||null,
-          dimensions:    it.dimensions||null,
-          series:        null,
-          availability:  it.availability||"Available",
-          writeup:       it.writeup||null,
-          price:         it.price||null,
-          tags:          it.tags||[],
-          image_position:it.image_position||"center",
+        const batchData={
+          artist_id:   it.resolvedArtistId||artistId,
+          title:       it.title||"Untitled",
+          year:        it.year||null,
+          medium:      it.medium||null,
+          dimensions:  it.dimensions||null,
+          availability:it.availability||"Available",
+          writeup:     it.writeup||null,
           image_url,
-        });
+        };
+        if(it.price) batchData.price=it.price;
+        if(it.tags&&it.tags.length>0) batchData.tags=it.tags;
+        if(it.image_position) batchData.image_position=it.image_position;
+        await sbInsert("artworks",batchData);
       }catch(e){failed++;}
       setProgress({done:i+1,total:items.length});
     }
@@ -792,20 +806,23 @@ function AddArtworkForm({artists,reload}){
     setSaving(true);setErr("");
     try{
       const image_url=await sbUploadImage("artwork-images",form._imageData);
-      await sbInsert("artworks",{
+      // Build insert object with only core fields first
+      const insertData={
         artist_id:form.artist_id,
         title:form.title.trim(),
         year:form.year||null,
         medium:form.medium||null,
         dimensions:form.dimensions||null,
         series:form.series||null,
-        availability:form.availability,
+        availability:form.availability||"Available",
         writeup:form.writeup||null,
-        price:form.price||null,
-        tags:form.tags||[],
-        image_position:form.image_position||"center",
         image_url,
-      });
+      };
+      // Add optional columns only if they exist in schema
+      if(form.price) insertData.price=form.price;
+      if(form.tags&&form.tags.length>0) insertData.tags=form.tags;
+      if(form.image_position) insertData.image_position=form.image_position;
+      await sbInsert("artworks",insertData);
       await reload();
       setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
       setOk(true);setTimeout(()=>setOk(false),3000);
