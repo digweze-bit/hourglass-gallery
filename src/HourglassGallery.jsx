@@ -69,13 +69,10 @@ const sbHeaders = {
   "Prefer": "return=representation",
 };
 
-async function sbQuery(table, opts={}) {
-  let url = `${SB_URL}/rest/v1/${table}?`;
-  if (opts.select)  url += `select=${opts.select}&`;
-  if (opts.filter)  url += `${opts.filter}&`;
-  if (opts.order)   url += `order=${opts.order}&`;
-  if (opts.limit)   url += `limit=${opts.limit}&`;
-  const res = await fetch(url, { headers: sbHeaders });
+async function sbQuery(table, queryString="") {
+  const url = `${SB_URL}/rest/v1/${table}?${queryString}`;
+  // Request up to 10000 rows to avoid Supabase default 1000 row limit
+  const res = await fetch(url, { headers: {...sbHeaders, "Range": "0-9999"} });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
