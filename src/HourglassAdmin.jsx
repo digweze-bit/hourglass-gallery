@@ -858,10 +858,15 @@ function AddArtworkForm({artists,reload}){
       <PositionToggle value={form.image_position} onChange={v=>setForm(p=>({...p,image_position:v}))}/>
       <TagInput tags={form.tags} onChange={tags=>setForm(p=>({...p,tags}))}/>
     </div>
-    <div style={{marginTop:8}}>
-      <ErrMsg text={err}/>
-      <SuccessMsg show={ok} text="Artwork saved."/>
-      <Btn onClick={save}>{saving?"Uploading…":"Save Artwork"}</Btn>
+    <ErrMsg text={err}/>
+    <SuccessMsg show={ok} text="Artwork saved."/>
+    <div style={{marginTop:16}}>
+      <button type="button"
+        onClick={()=>{ save(); }}
+        disabled={saving}
+        style={{background:saving?"#888":C.black,color:C.white,border:"none",cursor:saving?"not-allowed":"pointer",padding:"13px 32px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif"}}>
+        {saving?"Uploading…":"Save Artwork"}
+      </button>
     </div>
   </div>);
 }
