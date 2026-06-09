@@ -74,7 +74,7 @@ async function sbUploadImage(bucket,dataUrl){
   return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;
 }
 
-function Btn({onClick,children}){const [h,setH]=useState(false);return <button onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)} style={{background:h?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>{children}</button>;}
+function Btn({onClick,children}){const [h,setH]=useState(false);return <button type="button" onClick={onClick} onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)} style={{background:h?C.orange:C.black,color:C.white,border:"none",cursor:"pointer",padding:"10px 20px",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",transition:"background 0.2s"}}>{children}</button>;}
 function DangerBtn({onClick,children}){return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",color:"#cc3333",fontSize:11,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif"}}>{children}</button>;}
 function FInput({label,value,onChange,placeholder}){return <div style={{marginBottom:20}}><label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>{label}</label><input value={value} onChange={onChange} placeholder={placeholder} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.border}`,background:C.white,fontFamily:"DM Sans,sans-serif",fontSize:13,outline:"none",color:C.black,boxSizing:"border-box"}}/></div>;}
 function FTextarea({label,value,onChange,placeholder}){return <div style={{marginBottom:20}}><label style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:C.grey,display:"block",marginBottom:8}}>{label}</label><textarea value={value} onChange={onChange} placeholder={placeholder} rows={4} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.border}`,background:C.white,fontFamily:"DM Sans,sans-serif",fontSize:13,outline:"none",color:C.black,resize:"vertical",lineHeight:1.6,boxSizing:"border-box"}}/></div>;}
@@ -824,7 +824,7 @@ function AddArtworkForm({artists,reload}){
       if(form.image_position) insertData.image_position=form.image_position;
       await sbInsert("artworks",insertData);
       await reload();
-      setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:""});
+      setForm({title:"",year:"",medium:"",dimensions:"",series:"",availability:"Available",writeup:"",_imageData:"",artist_id:"",price:"",tags:[],image_position:"center"});
       setOk(true);setTimeout(()=>setOk(false),3000);
     }catch(e){setErr("Error: "+e.message);}
     setSaving(false);
@@ -858,6 +858,10 @@ function AddArtworkForm({artists,reload}){
       <PositionToggle value={form.image_position} onChange={v=>setForm(p=>({...p,image_position:v}))}/>
       <TagInput tags={form.tags} onChange={tags=>setForm(p=>({...p,tags}))}/>
     </div>
-    <Btn onClick={save}>{saving?"Uploading…":"Save Artwork"}</Btn>
+    <div style={{marginTop:8}}>
+      <ErrMsg text={err}/>
+      <SuccessMsg show={ok} text="Artwork saved."/>
+      <Btn onClick={save}>{saving?"Uploading…":"Save Artwork"}</Btn>
+    </div>
   </div>);
 }
