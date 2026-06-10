@@ -70,11 +70,23 @@ const sbHeaders = {
 };
 
 async function sbQuery(table, queryString="") {
-  const url = `${SB_URL}/rest/v1/${table}?${queryString}`;
-  // Request up to 10000 rows to avoid Supabase default 1000 row limit
-  const res = await fetch(url, { headers: {...sbHeaders, "Range": "0-9999"} });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  // Fetch all rows in batches of 1000 to bypass Supabase default limit
+  let all = [];
+  let from = 0;
+  const batchSize = 1000;
+  while(true) {
+    const url = `${SB_URL}/rest/v1/${table}?${queryString}`;
+    const res = await fetch(url, { 
+      headers: {...sbHeaders, "Range": `${from}-${from+batchSize-1}`, "Range-Unit": "items"} 
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const batch = await res.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    all = [...all, ...batch];
+    if (batch.length < batchSize) break;
+    from += batchSize;
+  }
+  return all;
 }
 
 async function sbInsert(table, data) {
