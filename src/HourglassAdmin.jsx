@@ -18,7 +18,7 @@ const injectFonts = () => {
   document.head.appendChild(l);
 };
 
-const MAX_PX=1600, TARGET_KB=800, MIN_QUALITY=0.45;
+const MAX_PX=1800, TARGET_KB=400, MIN_QUALITY=0.45;
 function compressImage(file) {
   return new Promise(resolve => {
     const reader=new FileReader();
