@@ -153,6 +153,7 @@ export default function HourglassGallery() {
   const [screen,    setScreen]    = useState("home");
   const [curArtist, setCurArtist] = useState(null);
   const [curWork,   setCurWork]   = useState(null);
+  const [curPage,   setCurPage]   = useState(1);
   const [search,    setSearch]    = useState("");
 
   // ── Load data from Supabase ──
@@ -175,7 +176,7 @@ export default function HourglassGallery() {
   useEffect(()=>{ loadData(); },[]);
 
   const navToArtist = id => { setCurArtist(id); setScreen("artist"); window.scrollTo(0,0); };
-  const navToWork   = id => { setCurWork(id);   setScreen("artwork"); window.scrollTo(0,0); };
+  const navToWork   = (id, fromPage) => { setCurWork(id); setCurPage(fromPage||1); setScreen("artwork"); window.scrollTo(0,0); };
   const navHome     = ()  => { setScreen("home"); window.scrollTo(0,0); };
   const navAdmin    = ()  => { setScreen("admin"); window.scrollTo(0,0); };
 
@@ -203,7 +204,7 @@ export default function HourglassGallery() {
       )}
 
       {screen==="home"    && <HomeScreen    artists={artists} artworks={artworks} search={search} setSearch={setSearch} onSelectArtist={navToArtist} onSelectWork={navToWork}/>}
-      {screen==="artist"  && <ArtistScreen  artists={artists} artworks={artworks} artistId={curArtist} onBack={navHome} onSelectWork={navToWork}/>}
+      {screen==="artist"  && <ArtistScreen  artists={artists} artworks={artworks} artistId={curArtist} onBack={navHome} onSelectWork={navToWork} initPage={curPage}/>}
       {screen==="artwork" && <ArtworkScreen artists={artists} artworks={artworks} artworkId={curWork} onBack={()=>{setScreen("artist");window.scrollTo(0,0);}}/>}
       {screen==="admin"   && <AdminScreen   artists={artists} artworks={artworks} setArtists={setArtists} setArtworks={setArtworks} onBack={navHome} reload={loadData}/>}
     </div>
@@ -433,7 +434,7 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
   const [loadingWorks,setLoadingWorks]=useState(true);
   const [copied,setCopied]=useState(false);
   const [mediumFilter,setMediumFilter]=useState("all");
-  const [page,setPage]=useState(1);
+  const [page,setPage]=useState(initPage||1);
   const [perPage,setPerPage]=useState(20);
   const qrUrl=`${window.location.origin}${window.location.pathname}?artist=${artistId}`;
 
@@ -517,7 +518,7 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
             {!paginated.length
               ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works match this filter.</div>
               : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:2}}>
-                  {paginated.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
+                  {paginated.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id,page)}/>)}
                 </div>
             }
 
@@ -592,11 +593,32 @@ function ThumbItem({work,onClick}){
 // ARTWORK PAGE
 // ═══════════════════════════════════════════
 function ArtworkScreen({artists,artworks,artworkId,onBack}){
-  const work=artworks.find(w=>w.id===artworkId);
-  const artist=work?artists.find(a=>a.id===work.artist_id):null;
+  const [work,setWork]=useState(null);
+  const [loadingWork,setLoadingWork]=useState(true);
   const [copied,setCopied]=useState(false);
   const shareUrl=`${window.location.origin}${window.location.pathname}?artwork=${artworkId}`;
-  if(!work) return null;
+
+  useEffect(()=>{
+    setLoadingWork(true);
+    sbQuery("artworks",`select=*&id=eq.${artworkId}`)
+      .then(rows=>{ setWork(rows&&rows[0]||null); setLoadingWork(false); })
+      .catch(()=>setLoadingWork(false));
+  },[artworkId]);
+
+  const artist=work?artists.find(a=>a.id===work.artist_id):null;
+
+  if(loadingWork) return(
+    <div>
+      <BackBtn onClick={onBack} label="Back"/>
+      <div style={{padding:"60px 40px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:C.lightGrey,fontFamily:"DM Sans,sans-serif"}}>Loading…</div>
+    </div>
+  );
+  if(!work) return(
+    <div>
+      <BackBtn onClick={onBack} label="Back"/>
+      <div style={{padding:"60px 40px",fontSize:11,color:C.lightGrey,fontFamily:"DM Sans,sans-serif"}}>Artwork not found.</div>
+    </div>
+  );
   const specs=[["Year",work.year],["Medium",work.medium],["Dimensions",work.dimensions?`${work.dimensions} in`:null],["Series / Edition",work.series],["Availability",work.availability]].filter(([,v])=>v);
   return (
     <div>
