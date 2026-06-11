@@ -22,8 +22,8 @@ const injectFonts = () => {
 };
 
 // ── Image compression ─────────────────────
-const MAX_PX = 1600;
-const TARGET_KB = 800;
+const MAX_PX = 1800;
+const TARGET_KB = 400;
 const MIN_QUALITY = 0.45;
 
 function compressImage(file) {
@@ -159,11 +159,13 @@ export default function HourglassGallery() {
   const loadData = async () => {
     setLoading(true); setError("");
     try {
-      const [a,w] = await Promise.all([
+      // Only load artists on startup — artworks loaded per-artist on demand
+      const [a, counts] = await Promise.all([
         sbQuery("artists","select=*&order=name.asc"),
-        sbQuery("artworks","select=*&order=created_at.asc"),
+        sbQuery("artworks","select=id,artist_id"),
       ]);
-      setArtists(a||[]); setArtworks(w||[]);
+      setArtists(a||[]);
+      setArtworks(counts||[]); // lightweight: just ids for counts on home page
     } catch(e) {
       setError("Could not connect to database. Check your Supabase settings. "+e.message);
     }
@@ -423,17 +425,35 @@ function ArtistRow({artist,artworks,onClick}){
 // ═══════════════════════════════════════════
 // ARTIST PAGE
 // ═══════════════════════════════════════════
+const PAGE_OPTIONS = [20, 40, 60, 120, "All"];
+
 function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
   const artist=artists.find(a=>a.id===artistId);
-  const works=artworks.filter(w=>w.artist_id===artistId);
+  const [works,setWorks]=useState([]);
+  const [loadingWorks,setLoadingWorks]=useState(true);
   const [copied,setCopied]=useState(false);
+  const [mediumFilter,setMediumFilter]=useState("all");
+  const [page,setPage]=useState(1);
+  const [perPage,setPerPage]=useState(20);
   const qrUrl=`${window.location.origin}${window.location.pathname}?artist=${artistId}`;
+
+  // Load this artist's full artworks on demand
+  useEffect(()=>{
+    setLoadingWorks(true);
+    setPage(1);
+    setMediumFilter("all");
+    sbQuery("artworks",`select=*&artist_id=eq.${artistId}&order=created_at.asc`)
+      .then(w=>{ setWorks(w||[]); setLoadingWorks(false); })
+      .catch(()=>setLoadingWorks(false));
+  },[artistId]);
+
   if(!artist) return null;
 
-  // Collect unique mediums for this artist's works
   const mediums=[...new Set(works.map(w=>w.medium).filter(Boolean))].sort();
-  const [mediumFilter,setMediumFilter]=useState("all");
   const filtered=mediumFilter==="all"?works:works.filter(w=>w.medium===mediumFilter);
+  const effectivePerPage=perPage==="All"?filtered.length:perPage;
+  const totalPages=Math.ceil(filtered.length/effectivePerPage);
+  const paginated=filtered.slice((page-1)*effectivePerPage, page*effectivePerPage);
 
   return (
     <div>
@@ -466,7 +486,7 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
       {mediums.length>1&&(
         <div style={{padding:"0 40px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:0,overflowX:"auto"}}>
           {["all",...mediums].map(m=>(
-            <button key={m} onClick={()=>setMediumFilter(m)}
+            <button key={m} onClick={()=>{setMediumFilter(m);setPage(1);}}
               style={{background:"none",border:"none",borderBottom:mediumFilter===m?`2px solid ${C.orange}`:"2px solid transparent",cursor:"pointer",padding:"10px 16px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"DM Sans,sans-serif",color:mediumFilter===m?C.black:C.grey,whiteSpace:"nowrap",transition:"all 0.2s"}}>
               {m==="all"?`All (${works.length})`:m}
             </button>
@@ -476,15 +496,53 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
 
       {/* ── Works grid ── */}
       <div style={{padding:"24px 40px"}}>
-        <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginBottom:16,fontFamily:"DM Sans,sans-serif"}}>
-          {filtered.length} Work{filtered.length!==1?"s":""}
-          {mediumFilter!=="all"&&<span style={{color:C.orange}}> — {mediumFilter}</span>}
-        </div>
-        {!filtered.length
-          ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works match this filter.</div>
-          : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:2}}>
-              {filtered.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
+        {loadingWorks
+          ? <div style={{fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:C.lightGrey,fontFamily:"DM Sans,sans-serif"}}>Loading works…</div>
+          : <>
+            <div style={{fontSize:9,letterSpacing:"0.2em",textTransform:"uppercase",color:C.lightGrey,marginBottom:16,fontFamily:"DM Sans,sans-serif",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+              <span>{filtered.length} Work{filtered.length!==1?"s":""}
+                {mediumFilter!=="all"&&<span style={{color:C.orange}}> — {mediumFilter}</span>}
+                {totalPages>1&&<span style={{marginLeft:12}}>· Page {page} of {totalPages}</span>}
+              </span>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{fontSize:9,letterSpacing:"0.15em",color:C.lightGrey,marginRight:4}}>Show:</span>
+                {PAGE_OPTIONS.map(opt=>(
+                  <button key={opt} onClick={()=>{setPerPage(opt);setPage(1);}}
+                    style={{padding:"3px 8px",fontSize:9,letterSpacing:"0.1em",fontFamily:"DM Sans,sans-serif",cursor:"pointer",border:`1px solid ${perPage===opt?C.orange:C.border}`,background:perPage===opt?"#fff8f5":C.white,color:perPage===opt?C.orange:C.grey,transition:"all 0.15s"}}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
+            {!paginated.length
+              ? <div style={{color:C.lightGrey,fontFamily:"DM Sans,sans-serif",fontSize:13}}>No works match this filter.</div>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:2}}>
+                  {paginated.map(w=><ThumbItem key={w.id} work={w} onClick={()=>onSelectWork(w.id)}/>)}
+                </div>
+            }
+
+            {/* ── Pagination ── */}
+            {totalPages>1&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:32,flexWrap:"wrap"}}>
+                <PageBtn onClick={()=>{setPage(1);window.scrollTo(0,0);}} disabled={page===1}>«</PageBtn>
+                <PageBtn onClick={()=>{setPage(p=>Math.max(1,p-1));window.scrollTo(0,0);}} disabled={page===1}>‹</PageBtn>
+                {Array.from({length:totalPages},(_,i)=>i+1)
+                  .filter(p=>p===1||p===totalPages||Math.abs(p-page)<=2)
+                  .reduce((acc,p,i,arr)=>{
+                    if(i>0&&p-arr[i-1]>1) acc.push("...");
+                    acc.push(p);
+                    return acc;
+                  },[])
+                  .map((p,i)=>p==="..."
+                    ? <span key={`ellipsis-${i}`} style={{padding:"0 4px",color:C.lightGrey,fontSize:12}}>…</span>
+                    : <PageBtn key={p} onClick={()=>{setPage(p);window.scrollTo(0,0);}} active={page===p}>{p}</PageBtn>
+                  )
+                }
+                <PageBtn onClick={()=>{setPage(p=>Math.min(totalPages,p+1));window.scrollTo(0,0);}} disabled={page===totalPages}>›</PageBtn>
+                <PageBtn onClick={()=>{setPage(totalPages);window.scrollTo(0,0);}} disabled={page===totalPages}>»</PageBtn>
+              </div>
+            )}
+          </>
         }
       </div>
 
@@ -498,6 +556,17 @@ function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
         </div>
       )}
     </div>
+  );
+}
+
+function PageBtn({onClick,children,disabled,active}){
+  const [h,setH]=useState(false);
+  return(
+    <button onClick={onClick} disabled={disabled}
+      onMouseOver={()=>setH(true)} onMouseOut={()=>setH(false)}
+      style={{minWidth:32,height:32,padding:"0 8px",border:`1px solid ${active?C.orange:C.border}`,background:active?C.orange:h&&!disabled?"#fff8f5":C.white,color:active?C.white:disabled?C.lightGrey:C.charcoal,cursor:disabled?"default":"pointer",fontSize:12,fontFamily:"DM Sans,sans-serif",transition:"all 0.15s"}}>
+      {children}
+    </button>
   );
 }
 function ThumbItem({work,onClick}){
