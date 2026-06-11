@@ -66,20 +66,20 @@ const sbHeaders = {
   "apikey": SB_KEY,
   "Authorization": `Bearer ${SB_KEY}`,
   "Content-Type": "application/json",
-  "Prefer": "return=representation",
 };
 
 async function sbQuery(table, queryString="") {
-  // Fetch all rows in batches of 1000 to bypass Supabase default limit
   let all = [];
   let from = 0;
   const batchSize = 1000;
   while(true) {
     const url = `${SB_URL}/rest/v1/${table}?${queryString}`;
     const res = await fetch(url, { 
-      headers: {...sbHeaders, "Range": `${from}-${from+batchSize-1}`, "Range-Unit": "items"} 
+      headers: {...sbHeaders, "Range": `${from}-${from+batchSize-1}`, "Range-Unit": "items",
+        "Prefer": "count=none"} 
     });
-    if (!res.ok) throw new Error(await res.text());
+    // 200 or 206 (partial) are both success
+    if (!res.ok && res.status !== 206) throw new Error(await res.text());
     const batch = await res.json();
     if (!Array.isArray(batch) || batch.length === 0) break;
     all = [...all, ...batch];
