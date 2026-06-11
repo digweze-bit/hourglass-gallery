@@ -428,7 +428,7 @@ function ArtistRow({artist,artworks,onClick}){
 // ═══════════════════════════════════════════
 const PAGE_OPTIONS = [20, 40, 60, 120, "All"];
 
-function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork}){
+function ArtistScreen({artists,artworks,artistId,onBack,onSelectWork,initPage}){
   const artist=artists.find(a=>a.id===artistId);
   const [works,setWorks]=useState([]);
   const [loadingWorks,setLoadingWorks]=useState(true);
